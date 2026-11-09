@@ -1,0 +1,133 @@
+{
+  "name": "Main",
+  "mode": "3D",
+  "objects": [
+    {
+      "id": "player",
+      "name": "Player",
+      "type": "CharacterBody3D",
+      "position": [
+        0,
+        0.9,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1.8,
+        1
+      ],
+      "color": "#A98BFF",
+      "script": "Scripts/Main.velv"
+    },
+    {
+      "id": "ground",
+      "name": "Chão",
+      "type": "Box",
+      "position": [
+        0,
+        -0.1,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        20,
+        0.2,
+        20
+      ],
+      "color": "#262B3A"
+    },
+    {
+      "id": "pillar-left",
+      "name": "Pilar Esquerdo",
+      "type": "Box",
+      "position": [
+        -6,
+        1.5,
+        -4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        3,
+        1
+      ],
+      "color": "#3B3358"
+    },
+    {
+      "id": "pillar-right",
+      "name": "Pilar Direito",
+      "type": "Box",
+      "position": [
+        6,
+        1.5,
+        -4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        3,
+        1
+      ],
+      "color": "#3B3358"
+    },
+    {
+      "id": "orb",
+      "name": "Esfera",
+      "type": "Sphere",
+      "position": [
+        0,
+        1.6,
+        -7
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1.7,
+        1.7,
+        1.7
+      ],
+      "color": "#8B6CFF"
+    },
+    {
+      "id": "platform",
+      "name": "Plataforma",
+      "type": "Box",
+      "position": [
+        4,
+        0.4,
+        -2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        4,
+        0.8,
+        4
+      ],
+      "color": "#332D50"
+    }
+  ]
+}

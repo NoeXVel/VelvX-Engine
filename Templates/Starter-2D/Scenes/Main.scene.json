@@ -1,0 +1,48 @@
+{
+  "name": "Main",
+  "mode": "2D",
+  "objects": [
+    {
+      "id": "background",
+      "name": "Fundo",
+      "type": "Rectangle",
+      "position": [0, 0, 0],
+      "size": [22, 13],
+      "color": "#121722"
+    },
+    {
+      "id": "ground",
+      "name": "Chão",
+      "type": "Rectangle",
+      "position": [0, -4.4, 0],
+      "size": [18, 0.6],
+      "color": "#242833"
+    },
+    {
+      "id": "platform",
+      "name": "Plataforma",
+      "type": "Rectangle",
+      "position": [-4, 0.8, 0],
+      "size": [4, 0.5],
+      "color": "#2E3242"
+    },
+    {
+      "id": "orb",
+      "name": "Orbe",
+      "type": "Ellipse",
+      "position": [4, 1.6, 0],
+      "size": [1.2, 1.2],
+      "color": "#8B6CFF"
+    },
+    {
+      "id": "player",
+      "name": "Player2D",
+      "type": "CharacterBody2D",
+      "position": [0, -2.4, 0],
+      "size": [1, 1],
+      "color": "#A98BFF",
+      "script": "Scripts/Main.velv"
+    }
+  ]
+}
+

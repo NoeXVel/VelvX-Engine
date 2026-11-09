@@ -1,0 +1,15 @@
+## Ponto de entrada do jogo 2D.
+## Main() roda uma vez, quando o Play começa.
+## InGame() roda a cada quadro — ideal para inputs e movimento.
+
+func Main()
+{
+    console.show("VelvX 2D pronta. Use WASD ou as setas para mover o Player2D.");
+}
+
+func InGame()
+{
+    ## Ordem dos argumentos: positivo X, negativo X, positivo Y, negativo Y.
+    var direcao = game.get_input_vectors("direita", "esquerda", "cima", "baixo");
+    this.CharacterBody2D.velocity = new.Vector2(direcao.x * 5, direcao.y * 5);
+}

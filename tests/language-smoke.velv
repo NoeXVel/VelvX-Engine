@@ -1,0 +1,28 @@
+## Teste headless da VelvX Language
+var total : Int = 0;
+var velocidade : Float = 3.5;
+
+func Main()
+{
+    console.show("Main executou. Velocidade = {velocidade}");
+
+    var i := 1;
+    while (i <= 3)
+    {
+        total += i;
+        i += 1;
+    }
+
+    console.show("Soma de 1..3 = {total}");
+    console.show("Cena: {Scene(\"Main\").object.name}");
+
+    var chao = Assets.pathObject("ground");
+    console.show("Objeto por caminho: {chao.name}");
+
+    this.CharacterBody3D.velocity = new.Vector3(1, 0, 0);
+}
+
+func InGame()
+{
+    console.show("Frame {total} | posição: {this.position}");
+}

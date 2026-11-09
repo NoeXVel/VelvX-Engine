@@ -1,0 +1,8 @@
+{
+  "id": "starter-3d",
+  "name": "Projeto 3D",
+  "description": "Cena 3D com chão, pilares, esfera e um Player com movimento por WASD.",
+  "mode": "3D",
+  "version": "0.1.0"
+}
+

@@ -1,0 +1,15 @@
+## Ponto de entrada do jogo 3D.
+## Main() roda uma vez, quando o Play começa.
+## InGame() roda a cada quadro — ideal para inputs e movimento.
+
+func Main()
+{
+    console.show("VelvX 3D pronta. Use WASD ou as setas para mover o Player.");
+}
+
+func InGame()
+{
+    ## Ordem dos argumentos: positivo X, negativo X, positivo Y, negativo Y.
+    var direcao = game.get_input_vectors("direita", "esquerda", "baixo", "cima");
+    this.CharacterBody3D.velocity = new.Vector3(direcao.x * 6, 0, direcao.y * 6);
+}

@@ -1,0 +1,402 @@
+<Window x:Class="VelvX.Engine.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VelvX Engine" Height="680" Width="1180" MinHeight="600" MinWidth="960"
+        WindowStartupLocation="Manual" Background="{StaticResource Canvas}"
+        Foreground="{StaticResource Text}" FontFamily="Segoe UI"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="238" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <!-- Barra lateral -->
+    <Border Grid.Column="0" Background="#12131A" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
+      <DockPanel Margin="16,22,14,20" LastChildFill="False">
+        <StackPanel DockPanel.Dock="Top">
+          <Grid Margin="6,0,4,30">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Width="40" Height="40" CornerRadius="13" Background="#2C2344">
+              <TextBlock Text="V" Foreground="{StaticResource Accent}" FontSize="23" FontWeight="Bold"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+              <TextBlock Text="VelvX" FontSize="19" FontWeight="Bold" />
+              <TextBlock Text="ENGINE" FontSize="9.5" FontWeight="SemiBold" Foreground="#7D7F8E"
+                         Margin="0,2,0,0" />
+            </StackPanel>
+          </Grid>
+
+          <TextBlock Text="ESPAÇO DE TRABALHO" Style="{StaticResource SectionLabel}" Margin="12,0,0,9" />
+
+          <Button x:Name="HomeNav" Style="{StaticResource NavButtonActive}" Click="Home_Click">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="⌂" Width="23" FontSize="14" VerticalAlignment="Center" />
+              <TextBlock Text="Início" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="NewNav" Style="{StaticResource NavButton}" Click="NewProject_Click">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="＋" Width="23" FontSize="14" VerticalAlignment="Center" />
+              <TextBlock Text="Novo projeto" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Style="{StaticResource NavButton}" Click="OpenProject_Click">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="↗" Width="23" FontSize="14" VerticalAlignment="Center" />
+              <TextBlock Text="Abrir projeto" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+
+          <Border Height="1" Background="{StaticResource Line}" Margin="10,18,10,16" />
+          <TextBlock Text="ENGINE" Style="{StaticResource SectionLabel}" Margin="12,0,0,9" />
+
+          <Button Style="{StaticResource NavButton}" Click="TemplatesFolder_Click">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="▤" Width="23" FontSize="13" VerticalAlignment="Center" />
+              <TextBlock Text="Pasta de templates" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Style="{StaticResource NavButton}" Click="Reload_Click">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="⟳" Width="23" FontSize="13" VerticalAlignment="Center" />
+              <TextBlock Text="Recarregar" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom">
+          <TextBlock x:Name="SidebarStatus" Text="Pronto para criar." FontSize="10.5" Foreground="#6B6F7E"
+                     Margin="4,0,0,14" TextWrapping="Wrap" />
+          <Border Height="1" Background="{StaticResource Line}" Margin="0,0,0,14" />
+          <StackPanel Orientation="Horizontal" Margin="4,0,0,0">
+            <Border Width="28" Height="28" CornerRadius="9" Background="#221C33">
+              <TextBlock Text="V" FontSize="13" FontWeight="Bold" Foreground="{StaticResource Accent}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel VerticalAlignment="Center" Margin="9,0,0,0">
+              <TextBlock Text="VelvX Engine" FontSize="11.5" FontWeight="SemiBold" />
+              <TextBlock x:Name="VersionText" Text="v0.1.0" FontSize="9.5" Foreground="#6B6F7E" Margin="0,1,0,0" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Área principal -->
+    <Grid Grid.Column="1">
+      <Grid.Background>
+        <RadialGradientBrush Center="0.12,0" GradientOrigin="0.12,0" RadiusX="0.95" RadiusY="0.95">
+          <GradientStop Color="#191327" Offset="0" />
+          <GradientStop Color="#0F1015" Offset="0.58" />
+        </RadialGradientBrush>
+      </Grid.Background>
+
+      <!-- Início -->
+      <Grid x:Name="HomeView" Margin="42,28,42,22">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0">
+          <Border DockPanel.Dock="Right" Background="#1E1B2B" BorderBrush="#332C49" BorderThickness="1"
+                  CornerRadius="20" Padding="13,6" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal">
+              <Ellipse Width="6" Height="6" Fill="{StaticResource Success}" VerticalAlignment="Center" />
+              <TextBlock Text="2D + 3D" Foreground="#C9BBFF" FontSize="10.5" FontWeight="SemiBold"
+                         Margin="7,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+          <StackPanel>
+            <TextBlock Text="SEU ESTÚDIO" Style="{StaticResource SectionLabel}" Margin="0,0,0,4" />
+            <TextBlock Text="Pronto para criar." FontSize="18" FontWeight="SemiBold" />
+          </StackPanel>
+        </DockPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,20,0,0"
+                      HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="0,0,4,6">
+            <!-- Destaque -->
+            <Border CornerRadius="20" BorderThickness="1" BorderBrush="#2E2745" Padding="32,26">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                  <GradientStop Color="#221B36" Offset="0" />
+                  <GradientStop Color="#15141F" Offset="0.62" />
+                  <GradientStop Color="#121019" Offset="1" />
+                </LinearGradientBrush>
+              </Border.Background>
+              <StackPanel>
+                <TextBlock Text="VELVX ENGINE  ·  EARLY ACCESS" FontSize="10" FontWeight="Bold"
+                           Foreground="#B5A1FF" />
+                <TextBlock Text="Dê vida ao seu próximo mundo." FontSize="40" FontWeight="Bold"
+                           TextWrapping="Wrap" Margin="0,8,0,0" LineHeight="44" />
+                <TextBlock Text="Crie jogos 2D e 3D com a VelvX Language. Sua engine, suas regras, seus universos."
+                           FontSize="14" Foreground="#A8A3B8" Margin="1,8,0,0" TextWrapping="Wrap" />
+                <Grid Margin="0,24,0,0" Height="132">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+
+                  <Button Grid.Column="0" Style="{StaticResource HeroButton}" Click="NewProject_Click">
+                    <Button.Background>
+                      <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#BCA2FF" Offset="0" />
+                        <GradientStop Color="#8E6CF0" Offset="1" />
+                      </LinearGradientBrush>
+                    </Button.Background>
+                    <Grid>
+                      <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                      </Grid.RowDefinitions>
+                      <Border Width="40" Height="40" CornerRadius="12" Background="#3DFFFFFF"
+                              HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <TextBlock Text="＋" FontSize="21" Foreground="#241741" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                      </Border>
+                      <TextBlock Text="→" FontSize="17" Foreground="#3A2A61" HorizontalAlignment="Right"
+                                 VerticalAlignment="Top" />
+                      <StackPanel Grid.Row="1" Margin="0,16,0,0">
+                        <TextBlock Text="Novo projeto" FontSize="19" FontWeight="Bold" Foreground="#1B1329" />
+                        <TextBlock Text="Escolha um template 2D ou 3D" FontSize="11.5" Foreground="#4A386D"
+                                   Margin="0,4,0,0" />
+                      </StackPanel>
+                    </Grid>
+                  </Button>
+
+                  <Button Grid.Column="2" Style="{StaticResource HeroButton}" Click="OpenProject_Click"
+                          Background="#10121A" BorderBrush="#303445" BorderThickness="1">
+                    <Grid>
+                      <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                      </Grid.RowDefinitions>
+                      <Border Width="40" Height="40" CornerRadius="12" Background="#201B2E"
+                              HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <TextBlock Text="↗" FontSize="19" Foreground="#C2B2FF" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                      </Border>
+                      <TextBlock Text="→" FontSize="17" Foreground="#6E6A80" HorizontalAlignment="Right"
+                                 VerticalAlignment="Top" />
+                      <StackPanel Grid.Row="1" Margin="0,16,0,0">
+                        <TextBlock Text="Abrir projeto" FontSize="19" FontWeight="Bold" />
+                        <TextBlock Text="Continue de onde você parou" FontSize="11.5" Foreground="#8F92A2"
+                                   Margin="0,4,0,0" />
+                      </StackPanel>
+                    </Grid>
+                  </Button>
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <!-- Recentes -->
+            <Grid Margin="2,24,2,12">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Projetos recentes" FontSize="16.5" FontWeight="SemiBold" />
+                <Border Background="#1D1A29" CornerRadius="6" Padding="7,2" Margin="9,1,0,0"
+                        VerticalAlignment="Center">
+                  <TextBlock x:Name="RecentCountText" Text="0" FontSize="9.5" FontWeight="Bold"
+                             Foreground="#A794E8" />
+                </Border>
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button x:Name="ClearRecentsButton" Style="{StaticResource GhostButton}" Content="Limpar"
+                        Click="ClearRecents_Click" Visibility="Collapsed" Margin="0,0,4,0" />
+                <Button Style="{StaticResource GhostButton}" Content="Procurar projeto  →"
+                        Click="OpenProject_Click" />
+              </StackPanel>
+            </Grid>
+
+            <ItemsControl x:Name="RecentList">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Style="{StaticResource CardButton}" Margin="0,0,0,8" Padding="14,12"
+                          Tag="{Binding FolderPath}" Click="Recent_Click">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <Border Width="42" Height="42" CornerRadius="11" Background="#231D33">
+                        <TextBlock Text="{Binding Glyph}" FontSize="18" Foreground="#BDA9FF"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="13,0,14,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                          <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                     VerticalAlignment="Center" />
+                          <Border Background="#20232E" CornerRadius="5" Padding="6,1" Margin="9,0,0,0"
+                                  VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Mode}" FontSize="8.5" FontWeight="Bold"
+                                       Foreground="#A99BE0" />
+                          </Border>
+                        </StackPanel>
+                        <TextBlock Text="{Binding FolderPath}" FontSize="10.5" Foreground="#7E8292"
+                                   Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding StatusLabel}" FontSize="9.5" Foreground="#6E7280"
+                                   HorizontalAlignment="Right" />
+                        <TextBlock Text="Abrir  →" FontSize="10.5" FontWeight="SemiBold"
+                                   Foreground="#B3A1F8" HorizontalAlignment="Right" Margin="0,5,0,0" />
+                      </StackPanel>
+                    </Grid>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border x:Name="RecentEmpty" Visibility="Collapsed" Background="#13151C" BorderBrush="#262A34"
+                    BorderThickness="1" CornerRadius="14" Padding="24,20">
+              <StackPanel HorizontalAlignment="Center">
+                <TextBlock Text="◇" FontSize="25" Foreground="#565A68" HorizontalAlignment="Center" />
+                <TextBlock Text="Nenhum projeto por aqui ainda" FontSize="13" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" Margin="0,9,0,0" />
+                <TextBlock Text="Crie um projeto novo ou abra uma pasta que já exista."
+                           FontSize="11" Foreground="{StaticResource Muted}" HorizontalAlignment="Center"
+                           Margin="0,5,0,0" />
+              </StackPanel>
+            </Border>
+
+            <TextBlock Text="VelvX Language  ·  2D + 3D  ·  Feita para crescer com você."
+                       FontSize="10.5" Foreground="#5F6270" HorizontalAlignment="Center" Margin="0,14,0,2" />
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+
+      <!-- Novo projeto -->
+      <Grid x:Name="NewProjectView" Visibility="Collapsed" Margin="42,26,42,22">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+          <Button Style="{StaticResource GhostButton}" Content="←  Voltar ao início" Padding="0,4"
+                  HorizontalAlignment="Left" Click="Home_Click" />
+          <TextBlock Text="Novo projeto" FontSize="33" FontWeight="Bold" Margin="0,16,0,0" />
+          <TextBlock Text="Escolha uma base, dê um nome e comece a construir." FontSize="13.5"
+                     Foreground="{StaticResource Muted}" Margin="1,5,0,0" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,26,0,8"
+                      HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="0,0,4,4">
+            <TextBlock Text="1  ·  TEMPLATE BASE" Style="{StaticResource SectionLabel}" Margin="1,0,0,11" />
+
+            <ItemsControl x:Name="TemplateList">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <RadioButton GroupName="TemplateChoice" Margin="0,0,14,14" Tag="{Binding Id}"
+                               Checked="Template_Checked" IsChecked="{Binding IsSelected, Mode=OneWay}">
+                    <Grid Width="230" Margin="18,15,18,16">
+                      <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                      </Grid.RowDefinitions>
+                      <DockPanel>
+                        <Border DockPanel.Dock="Right" Background="#232735" CornerRadius="6" Padding="7,2"
+                                VerticalAlignment="Top">
+                          <TextBlock Text="{Binding ModeLabel}" FontSize="8.5" FontWeight="Bold"
+                                     Foreground="#B9A5FF" />
+                        </Border>
+                        <TextBlock Text="{Binding Glyph}" FontSize="20" Foreground="#BDA9FF" />
+                      </DockPanel>
+                      <StackPanel Grid.Row="1" Margin="0,10,0,0">
+                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Description}" FontSize="10.5" Foreground="#8E92A0"
+                                   TextWrapping="Wrap" Margin="0,4,0,0" LineHeight="15" />
+                      </StackPanel>
+                      <TextBlock Grid.Row="2" Text="{Binding FileSummary}" FontSize="9.5" Foreground="#686C7B"
+                                 Margin="0,10,0,0" />
+                    </Grid>
+                  </RadioButton>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border x:Name="TemplatesEmpty" Visibility="Collapsed" Background="#14161D" BorderBrush="#2A2E3A"
+                    BorderThickness="1" CornerRadius="12" Padding="22,18" Margin="0,0,14,0">
+              <StackPanel>
+                <TextBlock Text="Nenhum template encontrado" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock Text="Coloque uma pasta com template.json dentro de Templates e clique em Recarregar."
+                           FontSize="11" Foreground="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+
+            <TextBlock Text="2  ·  DETALHES DO PROJETO" Style="{StaticResource SectionLabel}"
+                       Margin="1,18,0,11" />
+
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="1.35*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="NOME DO PROJETO" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="ProjectNameBox" Height="42" Text="MeuJogo" />
+                <TextBlock Text="O nome também será o nome da pasta do jogo." FontSize="10"
+                           Foreground="#747888" Margin="1,6,0,0" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="LOCAL DO PROJETO" Style="{StaticResource FieldLabel}" />
+                <DockPanel>
+                  <Button DockPanel.Dock="Right" Content="Escolher" Background="#292C37" Padding="14,0"
+                          Height="42" Margin="8,0,0,0" Click="ChoosePath_Click" />
+                  <TextBox x:Name="ProjectPathBox" Height="42" FontSize="11.5" />
+                </DockPanel>
+                <TextBlock Text="Uma pasta com o nome do projeto será criada aqui." FontSize="10"
+                           Foreground="#747888" Margin="1,6,0,0" />
+              </StackPanel>
+            </Grid>
+
+            <Border Background="#141721" BorderBrush="#282C39" BorderThickness="1" CornerRadius="12"
+                    Padding="16,13" Margin="0,22,0,0">
+              <DockPanel>
+                <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="Abrir pasta"
+                        Click="TemplatesFolder_Click" VerticalAlignment="Center" />
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock Text="Crie seus próprios templates" FontSize="12" FontWeight="SemiBold" />
+                  <TextBlock Text="Monte um projeto do zero, copie a pasta dele para Templates e ele aparecerá aqui."
+                             FontSize="10.5" Foreground="#828695" Margin="0,3,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+              </DockPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="2" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Criar projeto  →"
+                    Padding="24,12" Click="CreateProject_Click" />
+            <TextBlock x:Name="TemplateHint" VerticalAlignment="Center" FontSize="10.5"
+                       Foreground="#747888" TextWrapping="Wrap" Margin="0,0,20,0"
+                       Text="O projeto será criado e aberto no editor." />
+          </DockPanel>
+        </Border>
+      </Grid>
+    </Grid>
+  </Grid>
+</Window>
