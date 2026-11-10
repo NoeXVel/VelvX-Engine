@@ -1,6 +1,6 @@
 # Arquitetura da VelvX Engine
 
-Este documento descreve como a versão **0.3.0 (Bigorna)** está organizada e quais são os pontos de extensão para as próximas etapas.
+Este documento descreve como a versão **0.4.0 (Bigorna — Fix)** está organizada e quais são os pontos de extensão para as próximas etapas.
 
 ## Visão geral
 
@@ -12,12 +12,12 @@ Launcher (MainWindow)
            │
            ▼
 Editor (EditorWindow)
-  ├─ Hierarquia      objetos, cenas carregadas, busca e criação
-  ├─ Viewport 3D     WPF Viewport3D, câmera orbital + WASD, gizmos
+  ├─ Hierarquia      árvore de atores (pai/filho), cenas carregadas, busca e criação
+  ├─ Viewport 3D     WPF Viewport3D, câmera orbital + WASD, gizmos mover/girar/escalar
   ├─ Viewport 2D     desenho vetorial, sprites, GIFs e spritesheets
-  ├─ Inspector       transformação, hierarquia, camada, aparência, assets,
-  │                  luz, volume, câmera, componentes e script do objeto
-  ├─ Script          AvalonEdit + realce da VelvX + ajuda
+  ├─ Inspector       transformação, hierarquia, camada, aparência, materiais,
+  │                  luz, volume, câmera, ator (LOD), componentes e script
+  ├─ Script          AvalonEdit + realce da VelvX + Documentação da linguagem
   ├─ Script grande   ScriptEditorWindow com autocomplete e auto-indent
   ├─ Recursos        cenas, scripts, assets e prefabs
   └─ Saída           console do jogo + FPS
@@ -36,9 +36,9 @@ Runtime (GameSession)
   ├─ Parser / Interpreter da VelvX
   ├─ InputState + InputMap do projeto
   ├─ SceneManager    cenas carregadas, ativa, load/unload/set_active
-  ├─ Componentes     scripts por objeto, Rotator/PointLight nativos,
-  │                  colliders, rigidbody, câmera e áudio
-  ├─ Física          integração simples, AABB e triggers
+  ├─ Componentes     scripts por ator, Rotator/PointLight nativos,
+  │                  colliders, MeshCollider, StaticBody, câmera e áudio
+  ├─ Física          integração simples, colisão AABB corpo ↔ estático e triggers
   └─ ponte cena ↔ objetos de script
 ```
 
@@ -61,10 +61,14 @@ MeuJogo/
 │  └─ Estrela.prefab.json
 └─ Assets/
    ├─ Audio/
+   ├─ Materials/
    ├─ Models/
    ├─ Sprites/
    └─ Textures/
 ```
+
+Os materiais ficam em `Assets/Materials/*.json` e podem ser reutilizados por
+qualquer ator com modelo.
 
 O arquivo do projeto segue o nome da pasta (`<Nome>.velvxproj`). Caminhos de cena, script e assets são relativos à pasta do projeto.
 
@@ -87,8 +91,10 @@ Cada cena tem `name`, `mode`, `environment` e `objects`. Cada objeto tem `id`, `
 
 - `parentId` (hierarquia);
 - `size` (2D);
-- `script` (script do objeto);
-- `model`, `modelTexture`, `modelScale`, `animation`, `animationSpeed`, `animationLoop` (Model3D);
+- `script` (script do ator);
+- `model`, `modelTexture`, `material`, `modelScale`, `animation`, `animationSpeed`, `animationLoop` (Model3D);
+- `colliderBounds` (caixa local do modelo para MeshCollider e física);
+- `lodEnabled`, `lodDistance`, `renderDistance` (ator e LOD);
 - `sprite` (path, columns, rows, fps, loop);
 - `intensity`, `range` (luzes e volumes);
 - `fov`, `nearPlane`, `farPlane`, `cameraActive` (câmeras);
@@ -97,10 +103,10 @@ Cada cena tem `name`, `mode`, `environment` e `objects`. Cada objeto tem `id`, `
 Tipos principais:
 
 - Genérico: `GameObject`/`Empty` — só Transform, usado como pai, marcador ou contêiner de componentes.
-- 3D: `Box`, `Sphere`, `Model3D`, `CharacterBody3D`, `PointLight`, `DirectionalLight`, `GlobalVolume`, `BoxVolume`, `Camera3D`.
+- 3D: `Box` (Cubo/Caixa), `Sphere`, `Cylinder`, `Capsule`, `Cone`, `Plane`, `Model3D`, `CharacterBody3D`, `StaticBody3D`, `PointLight`, `DirectionalLight`, `GlobalVolume`, `BoxVolume`, `Camera3D`.
 - 2D: `Rectangle`, `Ellipse`, `Sprite`, `CharacterBody2D`, `GlobalVolume`, `BoxVolume`, `Camera2D`.
 
-Todo objeto tem transformação e pode receber componentes; o Transform é a base da hierarquia.
+Todo ator tem transformação e pode receber componentes; o Transform é a base da hierarquia. A hierarquia do editor é uma árvore: mover, girar ou escalar um pai move os filhos junto.
 
 ## Templates
 
@@ -123,7 +129,7 @@ Valores em tempo de execução: `null`, `bool`, `double`, `string`, `VelvVector2
 
 Limites de proteção: profundidade de chamadas 64; laços `while` até 500.000 iterações por execução.
 
-O realce de sintaxe fica em `Language/VelvXHighlighting.cs` (definição XSHD embutida, carregada no AvalonEdit). A janela grande de script (`Windows/ScriptEditorWindow.xaml`) usa o mesmo realce, com `CompletionWindow` para autocomplete, estratégia de indentação de 4 espaços, lista de scripts do projeto e referência rápida com trechos clicáveis.
+O realce de sintaxe fica em `Language/VelvXHighlighting.cs` (definição XSHD embutida, carregada no AvalonEdit). A janela grande de script (`Windows/ScriptEditorWindow.xaml`) usa o mesmo realce, com `CompletionWindow` para autocomplete, estratégia de indentação de 4 espaços e lista de scripts do projeto. A referência da linguagem fica em `docs/VelvX-Language.md` e é exibida dentro do editor por `Windows/LanguageDocsWindow.xaml` (seções navegáveis, exemplos e formatação própria).
 
 ## Ponte cena ↔ script
 
@@ -142,11 +148,13 @@ O jogador é o objeto cujo `script` é o `EntryScript` do projeto; se não houve
 - `get_parent()`, `get_children()` e `find_child("Nome")` navegam pela árvore de `parentId`;
 - `is_child_of(outro)` verifica ancestralidade;
 - o inspetor permite escolher o pai sem criar ciclos;
-- a hierarquia visual do editor ainda lista os objetos de forma plana; o aninhamento visual fica para a 0.4.
+- a hierarquia visual do editor mostra a árvore aninhada e reordena os atores ao trocar o pai.
+
+`Core/SceneGraph.cs` é a fonte única das transformações: matriz local (`escala → rotação → translação`), matriz de mundo (`local × mundo do pai`), posição/eixos de mundo, conversão de delta para o espaço do pai e caixa de colisão mundial. Posição, rotação e escala exibidas no inspetor são locais em relação ao pai.
 
 ### Física, colliders e triggers
 
-`BoxCollider` e `SphereCollider` contribuem com AABBs. `Rigidbody` integra gravidade e velocidade; `CharacterBody` move por `velocity`. Quando dois colliders se cruzam e as camadas colidem, o runtime dispara `OnTriggerEnter`, `OnTriggerStay` e `OnTriggerExit` nos scripts dos objetos envolvidos. A matriz é configurada em **Configurações do Projeto → Camadas e scripts** (lista `A|B` para pares que não colidem).
+`BoxCollider` e `SphereCollider` contribuem com AABBs. `MeshCollider` usa a caixa alinhada do modelo importado preenchida automaticamente em `SceneObject.ColliderBounds`, sem desenho manual. `Rigidbody` integra gravidade e velocidade; `CharacterBody` move por `velocity` e o runtime resolve colisão contra `StaticBody`, `StaticBody3D` e colliders em várias passadas, detectando chão (`on_ground`) e zerando a velocidade vertical no impacto. Quando dois colliders se cruzam e as camadas colidem, o runtime dispara `OnTriggerEnter`, `OnTriggerStay` e `OnTriggerExit` nos scripts dos atores envolvidos. A matriz é configurada em **Configurações do Projeto → Camadas e scripts** (lista `A|B` para pares que não colidem).
 
 ## Cenas e streaming
 
@@ -163,9 +171,9 @@ O jogador é o objeto cujo `script` é o `EntryScript` do projeto; se não houve
 - O modo Play clona a cena antes de executar e restaura o clone ao parar, então o jogo nunca altera a cena salva.
 - O laço roda em um `DispatcherTimer` no intervalo do limite de FPS; `game.delta_time` é limitado a 0,1 s para evitar saltos.
 - Input: `Window.PreviewKeyDown/Up` alimenta `InputState`; durante o Play qualquer tecla é encaminhada ao jogo e `Esc` encerra.
-- Câmera 3D: órbita com botão direito, pan com o botão do meio, zoom com scroll, `WASD`/setas para mover, `E`/`Q` para subir/descer, `Shift` para acelerar, `F` ou **Focar** para centralizar no objeto.
+- Câmera 3D: movimento livre e contínuo (sem grade), órbita com botão direito, pan com o botão do meio, zoom com scroll, `WASD`/setas para mover, `E`/`Q` para subir/descer, `Shift` para acelerar, `F` ou **Focar** para centralizar no ator.
 - Câmeras de jogo: `Camera3D`/`Camera2D` (ou o componente `Camera`) com FOV, near, far e **câmera principal**; uma única câmera é marcada como principal e o Play usa sua transformação.
-- Gizmos: projeção dos eixos X/Y/Z para a tela a partir da posição do objeto, teste de acerto por segmento e arraste convertido em unidades por pixel. `Ctrl`/`Shift` aplicam snap.
+- Gizmos: modos **Mover**, **Girar** e **Escalar**, alternados por `1`, `2` e `3` (ou teclado numérico) e pela barra no viewport. As alças são projetadas para a tela e o arraste é convertido em unidades/eixos de mundo; o centro do gizmo arrasta o ator livremente no plano da câmera. `Ctrl`/`Shift` aplicam snap.
 - Seleção: o viewport faz hit-test no modelo visual e nos componentes, selecionando o objeto clicado.
 - 2D: clique esquerdo seleciona, setas X/Y movem o objeto, botão direito/meio move a vista e scroll dá zoom; sprites, GIFs e spritesheets são desenhados com `CroppedBitmap`.
 - Recursos: a árvore é montada a partir das pastas do projeto, com ícones por tipo; arrastar um objeto para `Prefabs` grava um `.prefab.json` e arrastar o prefab para a cena cria uma cópia.
@@ -173,7 +181,11 @@ O jogador é o objeto cujo `script` é o `EntryScript` do projeto; se não houve
 
 ## Renderização 3D
 
-`Rendering/ModelLoader.cs` usa Assimp para importar OBJ/FBX/GLTF/GLB, monta materiais com texturas, aplica skinning por CPU e amostra animações de nós/esqueleto por tempo. O `Scene3DView` converte modelos e formas primitivas em `ModelVisual3D`, aplica o ambiente da cena (`EnvironmentSettings`), mistura o tom do `GlobalVolume`, adiciona luzes pontuais de objetos/componentes e anima o componente `Rotator` no editor. `MeshRenderer` permite caixa/esfera/modelo com cor, escala e textura sem criar um objeto `Model3D` separado.
+`Rendering/ModelLoader.cs` usa Assimp para importar OBJ/FBX/GLTF/GLB, monta materiais com texturas, aplica skinning por CPU e amostra animações de nós/esqueleto por tempo. A importação mede os limites reais da malha e normaliza apenas exportações fora da faixa usual (maior eixo > 100 ou < 0,05), aplicando a correção na raiz para preservar rigs e animações. O `Scene3DView` converte modelos e formas primitivas em `ModelVisual3D`, aplica o ambiente da cena (`EnvironmentSettings`), mistura o tom do `GlobalVolume`, adiciona luzes pontuais e anima o componente `Rotator` no editor. A iluminação combina ambiente, sol direcional, preenchimento frio, recorte lilás e toque quente, com especular nos materiais. `BoxVolume` desenha preenchimento translúcido e arestas pulsantes, ficando mais forte quando um `CharacterBody` está dentro.
+
+Cada ator é renderizado com LOD por distância: malha completa perto, proxy de caixa no meio e corte pela distância de renderização no fim. O inspetor liga/desliga o LOD e ajusta as distâncias; ao desligar, o proxy sai da cena imediatamente. Materiais (`Core/MaterialDocument.cs`, `Windows/MaterialWindow.xaml`) guardam cor, textura, emissão, brilho, opacidade e tiling em `Assets/Materials`, e são aplicados ao modelo do ator.
+
+`MeshRenderer` permite caixa/esfera/modelo com cor, escala e textura sem criar um objeto `Model3D` separado.
 
 ## Scripts globais
 
@@ -192,12 +204,12 @@ O código de saída é `0` em sucesso e `1` em erro. Sem `--scene`, é criada um
 
 ## Build e distribuição
 
-`build.ps1` executa `dotnet publish` self-contained para `win-x64`, limpa a pasta de destino, garante a cópia de `Templates`, gera `dist\VelvX-Engine-win-x64.zip` e valida a presença do executável. A pasta `dist/` não é versionada; o pacote deve ser publicado em **GitHub Releases**.
+`build.ps1` executa `dotnet publish` self-contained para `win-x64`, limpa a pasta de destino, garante a cópia de `Templates`, gera o `LEIA-ME.txt`, compacta `dist\VelvX-Engine-win-x64.zip`, gera `dist\SHA256.txt` e valida a presença do executável. A pasta `dist/` não é versionada; o pacote deve ser publicado em **GitHub Releases** com o checksum no anexo.
 
 ## Próximas etapas sugeridas
 
 1. Sistema de UI (HUD, botões, textos e imagens) dentro do runtime.
-2. Matriz de colisão visual, em vez de lista de pares, e hierarquia aninhada no editor.
+2. Matriz de colisão visual, em vez de lista de pares, e colisão triângulo a triângulo no MeshCollider.
 3. Jogo de exemplo completo para demonstrar o fluxo de criação.
 4. Exportação de jogo independente (executável do jogo sem o editor).
 5. Física mais completa para `CharacterBody2D/3D`, raycasts e corpos rígidos.

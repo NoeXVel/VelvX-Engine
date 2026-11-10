@@ -4,7 +4,7 @@
 
 ![Launcher da VelvX Engine](docs/images/launcher.png)
 
-> **Versão 0.3.0 — Bigorna.** A build que corrige os problemas da [issue #1](https://github.com/NoeXVel/VelvX-Engine/issues/1) e fecha a base para jogos de verdade: gizmos que seguem o objeto, seleção pelo viewport, **GameObject + Transform** com componentes obrigatórios, câmera nativa, janela grande de script com autocomplete, física simples com triggers, hierarquia e camadas, scripts globais, escala/textura por modelo e templates **Vazio 3D/Vazio 2D**. É a primeira build sem os defeitos estruturais da Forja.
+> **Versão 0.4.0 — Bigorna (Fix).** A build que fecha o ciclo de correções: escala de modelos corrigida (com ou sem rig), gizmos de mover, girar e escalar com atalhos `1/2/3`, movimento livre no viewport, hierarquia que segue o pai, inspetor redesenhado, **Atores** com LOD e distância de renderização, primitivas 3D, **MeshCollider** automático, colisão entre **CharacterBody** e **StaticBody**, efeitos visuais nos Box Volumes, iluminação em três pontos e **materiais reutilizáveis**. A VelvX Language ganhou documentação profissional dentro do editor.
 
 ## O que já funciona
 
@@ -12,24 +12,29 @@
 
 - **Launcher** com projetos recentes, catálogo de templates (Starter e Vazio) e abertura de projetos.
 - **Novo projeto** 3D ou 2D com nome, pasta de destino e cópia do template. Os templates **Vazio 3D** e **Vazio 2D** começam apenas com a câmera e o script de entrada.
-- **GameObject + Transform**: todo objeto tem transformação, nome, camada, pai e pode receber componentes. O tipo **Objeto vazio** serve de contêiner e marcador.
-- **Hierarquia** com busca, seletor de cena, indicador de cenas carregadas e criação de objetos/cenas. O pai pode ser escolhido no inspetor, sem ciclos.
-- **Inspetor** completo: nome, posição, rotação, escala, cor, visibilidade, tag, **camada**, **pai**, modelo (com **escala e textura**), sprite, luz, volume, câmera e **componentes**.
-- **Setas de transformação (gizmos)** coloridas que **seguem o objeto** no viewport 3D e 2D: arraste X (vermelho), Y (verde) ou Z (azul). `Ctrl` arredonda para 0,25 e `Shift` para 0,1.
-- **Seleção pelo viewport**: clique no objeto no 3D para selecioná-lo.
-- **Câmera 3D de editor** com WASD/setas, `E`/`Q` para subir/descer, `Shift` para acelerar, botão direito para orbitar, botão do meio para mover e scroll para zoom.
-- **Janela grande de script**: abra pelo botão **Ampliar** ou pelo menu **Editor de script**. Tem autocomplete (`Ctrl+Espaço`), auto-indent, realce da VelvX, lista dos scripts do projeto, referência rápida clicável, abrir/salvar/salvar como e status Ln/Col.
-- **Painel de Recursos** ao lado da Saída: cenas, scripts e pastas `Assets/Audio`, `Assets/Models`, `Assets/Sprites`, `Assets/Textures` e `Prefabs`, com ícones por tipo e arrastar-soltar.
+- **Atores**: cada item da cena é um ator com transformação, nome, camada, pai e componentes. O tipo **Ator vazio** serve de contêiner e marcador.
+- **Hierarquia** com busca, seletor de cena, indicador de cenas carregadas e criação de atores/cenas. O pai pode ser escolhido no inspetor, sem ciclos, e os filhos acompanham posição, rotação e escala do pai.
+- **Inspetor** redesenhado: nome, posição, rotação, escala, cor, visibilidade, tag, **camada**, **pai**, modelo (com **escala, textura e material**), sprite, luz, volume, câmera, **componentes** e painel de **Ator** com LOD e distância de renderização.
+- **Gizmos 3D de mover, girar e escalar** (`1`, `2`, `3`): arraste os eixos coloridos ou o centro para mover livremente no plano da câmera. `Ctrl` encaixa em 0,25 (mover), 15° (girar) ou 0,25 (escalar); `Shift` refina o encaixe.
+- **Seleção pelo viewport**: clique no ator no 3D para selecioná-lo.
+- **Câmera 3D de editor** com WASD/setas, `E`/`Q` para subir/descer, `Shift` para acelerar, botão direito para orbitar, botão do meio para mover e scroll para zoom. O movimento é contínuo, sem saltos de grade.
+- **Materiais**: crie materiais em `Assets/Materials` com cor, emissão, textura, suavidade, opacidade e repetição, e aplique em qualquer modelo pelo inspetor.
+- **Janela grande de script** com autocomplete (`Ctrl+Espaço`), auto-indent, realce da VelvX, lista dos scripts do projeto, abrir/salvar/salvar como e status Ln/Col.
+- **Documentação da VelvX Language** dentro do editor: variáveis, comentários, funções, laços, vetores, APIs, componentes e exemplos completos, também disponível em `docs/VelvX-Language.md`.
+- **Painel de Recursos** ao lado da Saída: cenas, scripts, materiais e pastas `Assets/Audio`, `Assets/Models`, `Assets/Sprites`, `Assets/Textures` e `Prefabs`, com ícones por tipo e arrastar-soltar.
 - **Prefabs**: arraste um objeto da hierarquia para `Prefabs` (ou use o menu de contexto) e arraste o prefab de volta para a cena.
 - **Modo Play** com `F5`, `Esc` para parar, FPS ao vivo, restauração automática da cena e console de saída. A **câmera principal** do jogo é definida no inspetor.
 
 ### 3D
 
-- Modelos **OBJ, FBX, GLTF e GLB** com texturas, importação pelo editor e pelo inspetor, com **escala** e **textura** ajustáveis por objeto.
+- Modelos **OBJ, FBX, GLTF e GLB** com texturas, importação pelo editor e pelo inspetor, com **escala**, **textura** e **material** ajustáveis por ator. Modelos exportados em centímetros ou milímetros são normalizados automaticamente, com ou sem rig.
 - **Animações de modelo** (esqueleto ou nós) com escolha da animação, velocidade e loop.
-- Iluminação com ambiente, sol direcional, **luzes pontuais** por objeto ou componente, **Global Volume** (tom global) e **Box Volume**.
-- Componentes nativos: **Rotator**, **Mesh Renderer**, **PointLight**, **BoxCollider**, **SphereCollider**, **Rigidbody**, **AudioSource**, **Camera** e scripts.
-- **Física simples** com AABBs, gravidade e **triggers** `OnTriggerEnter/Stay/Exit` nos scripts.
+- **Primitivas 3D** no menu de adicionar ator: Cubo/Caixa, Esfera, Cilindro, Cápsula, Cone e Plano.
+- Iluminação com ambiente, sol direcional, preenchimento frio, recorte lilás e **luzes pontuais** por ator ou componente, **Global Volume** (tom global) e **Box Volume** com preenchimento pulsante e destaque ao tocar um corpo.
+- Componentes nativos: **Rotator**, **Mesh Renderer**, **PointLight**, **BoxCollider**, **SphereCollider**, **MeshCollider**, **StaticBody**, **CharacterBody**, **Rigidbody**, **AudioSource**, **Camera** e scripts.
+- **MeshCollider** lê a caixa do modelo importado automaticamente: não é preciso desenhar a colisão nem editar a camada.
+- **Física simples** com AABBs, gravidade, colisão entre **CharacterBody** e **StaticBody**/colliders e **triggers** `OnTriggerEnter/Stay/Exit` nos scripts.
+- **LOD por ator**: perto desenha o modelo completo, no meio usa um proxy leve e longe deixa de desenhar. A distância pode ser ajustada no inspetor.
 
 ### 2D
 
@@ -283,6 +288,7 @@ MeuJogo/
 ├─ Prefabs/
 ├─ Assets/
 │  ├─ Audio/
+│  ├─ Materials/
 │  ├─ Models/
 │  ├─ Sprites/
 │  └─ Textures/
@@ -298,7 +304,7 @@ Monte um projeto do zero, copie a pasta dele para `Templates/<nome>` e adicione 
   "name": "Meu template",
   "description": "Minha base de jogo personalizada.",
   "mode": "3D",
-  "version": "0.3.0"
+  "version": "0.4.0"
 }
 ```
 
@@ -317,6 +323,8 @@ Opções: `--frames N`, `--scene arquivo.scene.json`, `--mode 2D|3D`, `--out res
 - [VelvX Language](docs/VelvX-Language.md) — sintaxe, tipos, operadores, APIs e limites.
 - [Arquitetura](docs/ARQUITETURA.md) — como o launcher, o editor, o runtime e o build se conectam.
 - [Publicando no GitHub](docs/GITHUB.md) — primeiro envio, atualizações e releases.
+- [Notas da versão 0.4.0](docs/RELEASE-v0.4.0.md) — gizmos completos, escala de modelos, atores com LOD, materiais, MeshCollider, documentação da linguagem e correções de física e inspetor.
+- [Notas da versão 0.3.2](docs/RELEASE-v0.3.2.md) — correções da issue #2: layout, hierarquia, recursos, câmera, inputs, CharacterBody, partículas e iluminação.
 - [Notas da versão 0.3.0](docs/RELEASE-v0.3.0.md) — correções da issue #1, novidades e limitações da build Bigorna.
 - [Notas da versão 0.2.0](docs/RELEASE-v0.2.0.md) — histórico da build Forja.
 
@@ -326,4 +334,4 @@ Sistema de UI, matriz de colisão visual, hierarquia aninhada, jogo de exemplo, 
 
 ---
 
-Feito por **Gean** · VelvX Engine 0.3.0 “Bigorna” · [github.com/NoeXVel/VelvX-Engine](https://github.com/NoeXVel/VelvX-Engine)
+Feito por **Gean** · VelvX Engine 0.4.0 “Bigorna” · [github.com/NoeXVel/VelvX-Engine](https://github.com/NoeXVel/VelvX-Engine)

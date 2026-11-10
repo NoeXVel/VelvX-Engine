@@ -24,7 +24,7 @@ Os templates Starter trazem cenas de streaming, pastas de assets, um prefab de e
   "name": "Meu template",
   "description": "Minha base de jogo personalizada.",
   "mode": "3D",
-  "version": "0.3.0"
+  "version": "0.4.0"
 }
 ```
 

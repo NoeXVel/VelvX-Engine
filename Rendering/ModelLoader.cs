@@ -42,6 +42,12 @@ public sealed class ModelAsset
     public IReadOnlyList<ModelClip> Clips { get; }
     public bool HasAnimations => Clips.Count > 0;
 
+    /// <summary>Caixa ocupada pelo modelo já normalizada, em unidades do editor.</summary>
+    public Rect3D Bounds { get; private set; } = Rect3D.Empty;
+
+    /// <summary>Fator aplicado para corrigir modelos exportados em centímetros ou milímetros.</summary>
+    public double NormalizationScale { get; private set; } = 1;
+
     public static ModelAsset Load(string path)
     {
         if (!File.Exists(path))
@@ -73,7 +79,48 @@ public sealed class ModelAsset
             asset.SetClip(clips[0].Name, 1, true);
         else
             asset.ApplyPose(0);
+        asset.NormalizeScale();
         return asset;
+    }
+
+    /// <summary>
+    /// Normaliza modelos com escala de exportação absurda (por exemplo FBX em
+    /// centímetros ou GLTF em milímetros). O maior eixo passa a medir 2 unidades,
+    /// o que mantém rigs, skins e animações intactos porque a correção é aplicada
+    /// na raiz do modelo.
+    /// </summary>
+    private void NormalizeScale()
+    {
+        var original = _root.Bounds;
+        if (original.IsEmpty || double.IsNaN(original.SizeX) || double.IsInfinity(original.SizeX))
+        {
+            Bounds = original;
+            return;
+        }
+
+        var maxSize = Math.Max(original.SizeX, Math.Max(original.SizeY, original.SizeZ));
+        if (maxSize < 0.0001) { Bounds = original; return; }
+
+        // Só intervém quando o modelo está claramente fora da faixa usual (0,05 a 100).
+        // Dentro da faixa a escala original é preservada para manter a proporção
+        // entre peças do mesmo cenário.
+        var factor = 1.0;
+        if (maxSize > 100)
+            factor = 2.0 / maxSize;
+        else if (maxSize < 0.05)
+            factor = 2.0 / maxSize;
+
+        if (Math.Abs(factor - 1) > 0.0001)
+        {
+            NormalizationScale = factor;
+            _root.Transform = new ScaleTransform3D(factor, factor, factor);
+        }
+
+        Bounds = factor == 1.0
+            ? original
+            : new Rect3D(
+                original.X * factor, original.Y * factor, original.Z * factor,
+                original.SizeX * factor, original.SizeY * factor, original.SizeZ * factor);
     }
 
     public void SetClip(string? name, double speed = 1, bool loop = true)

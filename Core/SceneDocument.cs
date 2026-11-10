@@ -66,14 +66,19 @@ public sealed class SceneDocument
         var baseId = type switch
         {
             "CharacterBody3D" or "CharacterBody2D" => "player",
+            "StaticBody3D" => "static_body",
             "DirectionalLight" => "light",
             "PointLight" => "point_light",
             "Camera3D" or "Camera2D" => "camera",
             "GlobalVolume" => "global_volume",
             "BoxVolume" => "box_volume",
-            "GameObject" or "Empty" => "object",
+            "GameObject" or "Empty" => "actor",
             "Model3D" => "model",
             "Sprite" => "sprite",
+            "Capsule" => "capsule",
+            "Cylinder" => "cylinder",
+            "Plane" => "plane",
+            "Cone" => "cone",
             _ => type.ToLowerInvariant()
         };
 
@@ -89,6 +94,7 @@ public sealed class SceneDocument
         var baseName = string.IsNullOrWhiteSpace(desired) ? type switch
         {
             "CharacterBody3D" => "Player",
+            "StaticBody3D" => "Corpo estático",
             "CharacterBody2D" => "Player2D",
             "DirectionalLight" => "Luz",
             "PointLight" => "Luz pontual",
@@ -101,7 +107,13 @@ public sealed class SceneDocument
             "Model3D" => "Modelo",
             "GlobalVolume" => "Global Volume",
             "BoxVolume" => "Box Volume",
-            _ => "Objeto"
+            "Box" or "Cube" => "Caixa",
+            "Sphere" => "Esfera",
+            "Cylinder" => "Cilindro",
+            "Capsule" => "Cápsula",
+            "Plane" => "Plano",
+            "Cone" => "Cone",
+            _ => "Ator"
         } : desired.Trim();
 
         var name = baseName;
@@ -138,6 +150,10 @@ public sealed class SceneDocument
             case "CharacterBody2D":
                 item.Size = [1, 1];
                 break;
+            case "StaticBody3D":
+                item.Scale = [1, 1.6, 1];
+                item.Color = "#6E7A92";
+                break;
             case "Rectangle":
                 item.Size = [3, 1.6];
                 item.Color = "#2A2E3C";
@@ -150,8 +166,31 @@ public sealed class SceneDocument
                 item.Size = [1.5, 1.5];
                 item.Sprite = new SpriteSettings();
                 break;
+            case "Box":
+            case "Cube":
+                item.Type = "Box";
+                item.Scale = [1, 1, 1];
+                item.Color = "#7C7792";
+                break;
             case "Sphere":
                 item.Scale = [1, 1, 1];
+                item.Color = "#9A7BFF";
+                break;
+            case "Cylinder":
+                item.Scale = [1, 1.6, 1];
+                item.Color = "#7E8AA8";
+                break;
+            case "Capsule":
+                item.Scale = [0.8, 1.7, 0.8];
+                item.Color = "#B393FF";
+                break;
+            case "Plane":
+                item.Scale = [4, 0.06, 4];
+                item.Color = "#2E3240";
+                break;
+            case "Cone":
+                item.Scale = [1, 1.6, 1];
+                item.Color = "#E0A26A";
                 break;
             case "Model3D":
                 item.Scale = [1, 1, 1];
@@ -224,10 +263,23 @@ public sealed class SceneObject
 
     public string? Model { get; set; }
     public string? ModelTexture { get; set; }
+    public string? Material { get; set; }
     public double ModelScale { get; set; } = 1;
+
+    /// <summary>
+    /// Caixa local do modelo importado (minX, minY, minZ, maxX, maxY, maxZ),
+    /// preenchida automaticamente ao importar. Usada pelo MeshCollider para
+    /// colidir com a forma real do modelo, sem precisar desenhar a colisão.
+    /// </summary>
+    public double[]? ColliderBounds { get; set; }
     public string? Animation { get; set; }
     public double AnimationSpeed { get; set; } = 1;
     public bool AnimationLoop { get; set; } = true;
+
+    /// <summary>Ativa o LOD automático por distância no viewport e no Play.</summary>
+    public bool LodEnabled { get; set; } = true;
+    public double LodDistance { get; set; } = 28;
+    public double RenderDistance { get; set; } = 120;
 
     public SpriteSettings? Sprite { get; set; }
     public List<ComponentData> Components { get; set; } = [];
@@ -279,6 +331,7 @@ public sealed class SceneObject
         "GameObject" or "Empty" => "○",
         "CharacterBody3D" => "◆",
         "CharacterBody2D" => "◆",
+        "StaticBody3D" => "◈",
         "DirectionalLight" => "☀",
         "PointLight" => "☼",
         "Camera3D" or "Camera2D" => "▣",
@@ -289,6 +342,11 @@ public sealed class SceneObject
         "Sprite" => "▧",
         "GlobalVolume" => "◎",
         "BoxVolume" => "▢",
+        "Box" or "Cube" => "▣",
+        "Cylinder" => "◙",
+        "Capsule" => "◍",
+        "Plane" => "▬",
+        "Cone" => "▲",
         _ => "■"
     };
 
@@ -300,6 +358,8 @@ public sealed class SceneObject
         Scale ??= [1, 1, 1];
         if (string.IsNullOrWhiteSpace(Layer)) Layer = "Default";
         if (ModelScale <= 0.0001) ModelScale = 1;
+        if (LodDistance <= 0.1) LodDistance = 28;
+        if (RenderDistance <= LodDistance) RenderDistance = Math.Max(120, LodDistance * 4);
         if (Fov is <= 1 or >= 179) Fov = 55;
         if (NearPlane <= 0.001) NearPlane = 0.2;
         if (FarPlane <= NearPlane) FarPlane = 1200;
@@ -327,10 +387,15 @@ public sealed class SceneObject
         Tag = Tag,
         Model = Model,
         ModelTexture = ModelTexture,
+        Material = Material,
         ModelScale = ModelScale,
+        ColliderBounds = ColliderBounds is null ? null : [.. ColliderBounds],
         Animation = Animation,
         AnimationSpeed = AnimationSpeed,
         AnimationLoop = AnimationLoop,
+        LodEnabled = LodEnabled,
+        LodDistance = LodDistance,
+        RenderDistance = RenderDistance,
         Sprite = Sprite?.Clone(),
         Components = Components.Select(component => component.Clone()).ToList(),
         Intensity = Intensity,

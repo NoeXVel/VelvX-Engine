@@ -7,7 +7,7 @@ namespace VelvX.Engine.Core;
 public sealed class ProjectInfo
 {
     public string Name { get; set; } = "";
-    public string Version { get; set; } = "0.3.0";
+    public string Version { get; set; } = "0.4.0";
     public string Template { get; set; } = "";
     public string Mode { get; set; } = "3D";
     public string Language { get; set; } = EnginePaths.Language;
@@ -147,7 +147,7 @@ public sealed class GameProject
         foreach (var folder in new[]
                  {
                      "Scenes", "Scripts", "Assets", "Assets/Models", "Assets/Textures",
-                     "Assets/Sprites", "Assets/Audio", "Prefabs"
+                     "Assets/Materials", "Assets/Sprites", "Assets/Audio", "Prefabs"
                  })
             Directory.CreateDirectory(Path.Combine(FolderPath, folder.Replace('/', Path.DirectorySeparatorChar)));
     }

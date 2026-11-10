@@ -7,7 +7,8 @@
         Background="{StaticResource EditorBg}"
         Foreground="{StaticResource Text}"
         FontFamily="Segoe UI"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        PreviewKeyDown="Window_PreviewKeyDown">
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="58" />
@@ -89,7 +90,18 @@
                 <TextBlock Text="NOME DA AÇÃO" Style="{StaticResource FieldLabel}" />
                 <TextBox x:Name="ActionNameBox" Margin="0,0,0,12" TextChanged="ActionName_TextChanged" />
                 <TextBlock Text="TECLAS (SEPARE POR VÍRGULA)" Style="{StaticResource FieldLabel}" />
-                <TextBox x:Name="ActionKeysBox" Margin="0,0,0,8" TextChanged="ActionKeys_TextChanged" />
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox x:Name="ActionKeysBox" TextChanged="ActionKeys_TextChanged" />
+                  <Button x:Name="ListenKeysButton" Grid.Column="1" Style="{StaticResource GhostButton}"
+                          Content="Escutar tecla" Padding="10,6" FontSize="11" Margin="8,0,0,0"
+                          Click="ListenKeys_Click" />
+                </Grid>
+                <TextBlock x:Name="ListenHint" Text="Pressione a tecla desejada. Esc cancela."
+                           FontSize="9.5" Foreground="#C8A9FF" Margin="0,0,0,8" Visibility="Collapsed" />
                 <TextBlock Text="Exemplos: W, Space, LeftShift, Up, F1, E." FontSize="9.5" Foreground="#737888" TextWrapping="Wrap" Margin="0,0,0,14" />
                 <Border Background="#171A22" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="9" Padding="12,10">
                   <StackPanel>

@@ -1,10 +1,33 @@
 # VelvX Language
 
-A VelvX Language é a linguagem de script da VelvX Engine. Ela foi desenhada para ser simples de ler, parecida com linguagens modernas e integrada à cena: o mesmo script roda no modo **Play** do editor e no executor headless.
+A VelvX Language é a linguagem de script da VelvX Engine. Ela foi pensada para ser curta, legível e integrada à cena: o mesmo arquivo roda no modo **Play** do editor e no executor headless.
 
-Arquivos de script usam a extensão `.velv`. O ponto de entrada de um projeto é `Scripts/Main.velv`.
+Scripts usam a extensão `.velv`. O ponto de entrada padrão de um projeto é `Scripts/Main.velv`, mas cada ator também pode executar seu próprio script por meio do componente **Script**.
 
-## Comentários
+> Este documento descreve a linguagem da VelvX Engine 0.4.0. Se você está começando, leia as seções na ordem e use os exemplos como base.
+
+---
+
+## 1. Primeiro script
+
+```velv
+# Executado uma vez quando o Play começa.
+func Main()
+{
+    console.show("Olá, VelvX!");
+}
+
+# Executado a cada quadro enquanto o jogo estiver rodando.
+func InGame()
+{
+}
+```
+
+`Main()` é obrigatória para iniciar o jogo. `InGame()` é opcional. Se ocorrer um erro dentro de `InGame()`, o Play é encerrado e a mensagem aparece no painel **Saída** com linha e coluna.
+
+---
+
+## 2. Comentários
 
 ```velv
 # Comentário de uma linha
@@ -13,19 +36,30 @@ Arquivos de script usam a extensão `.velv`. O ponto de entrada de um projeto é
 #* Comentário de bloco no estilo VelvX *#
 ```
 
-## Variáveis
+Use comentários para explicar **por que** uma regra existe, não para repetir o código.
+
+---
+
+## 3. Variáveis
 
 ```velv
 var vida : Int = 100;
 var nome : String = "Gean";
 var ativo : Bool = true;
-var velocidade := 6.5;          # tipo inferido
+var velocidade := 6.5;             # o tipo é inferido pelo valor
 var posicao : Vector3 = new.Vector3(0, 1, 0);
 ```
 
-Tipos disponíveis para anotação:
+A anotação de tipo é opcional:
 
-| Tipo | Valores |
+- `var contador = 0;` — o tipo vem do valor (`Int`).
+- `var vida : Int = 10.9;` — o valor é convertido para o tipo indicado (`11`).
+- `var nome : String = 42;` — converte para texto (`"42"`).
+- Um tipo desconhecido é mantido sem conversão.
+
+### Tipos disponíveis
+
+| Tipo | Aceita |
 | --- | --- |
 | `Bool` / `Boolean` | `true`, `false` |
 | `String` / `Text` | textos entre aspas duplas ou simples |
@@ -34,50 +68,84 @@ Tipos disponíveis para anotação:
 | `Vector2` / `Vec2` | `x`, `y` |
 | `Vector3` / `Vec3` | `x`, `y`, `z` |
 
-A anotação é opcional. `:=` define o tipo pelo valor inicial; `:` com tipo explícito converte o valor para o tipo. Um tipo desconhecido é mantido sem conversão.
+### Atribuição e operadores de atribuição
 
 ```velv
-var contador = 0;
-contador += 1;
-contador *= 2;
+var pontos = 0;
+pontos = 10;
+pontos += 5;    # 15
+pontos -= 2;    # 13
+pontos *= 2;    # 26
+pontos /= 2;    # 13
 ```
 
-Operadores de atribuição: `=`, `+=`, `-=`, `*=`, `/=`.
+Uma variável criada dentro de uma função existe apenas naquela função. Variáveis globais podem ser declaradas no topo do arquivo.
 
-## Strings e interpolação
+---
+
+## 4. Strings e interpolação
 
 ```velv
 var tempTest : Int = 3;
-console.show("Rodei: {tempTest} vezes");
+console.show("Rodei {tempTest} vezes");
 console.show("Posição: {this.position.x}, {this.position.y}");
 ```
 
-Tudo que estiver entre `{` e `}` é avaliado como expressão. Use `{{` e `}}` para escrever chaves literais. Strings podem ser concatenadas com `+`.
+Tudo que estiver entre `{` e `}` é avaliado como expressão. Use `{{` e `}}` para escrever chaves literais.
 
-## Funções
+Strings podem ser concatenadas com `+`:
+
+```velv
+var nome = "VelvX";
+console.show("Bem-vindo ao " + nome);
+```
+
+---
+
+## 5. Funções
 
 ```velv
 func Main()
 {
-    console.show("Iniciou");
-}
-
-func InGame()
-{
-    # roda a cada quadro
+    var total = Somar(2, 3);
+    console.show("Total: {total}");
 }
 
 func Somar(a : Int, b : Int)
 {
     return a + b;
 }
+
+func InGame()
+{
+    # roda a cada quadro
+}
 ```
 
-Parâmetros aceitam anotação de tipo opcional. `return` sem valor encerra a função. Funções são globais e podem ser chamadas antes da declaração. Esta versão não anota o tipo de retorno: o valor devolvido mantém o tipo que tiver na expressão.
+Regras importantes:
 
-Os tipos dos parâmetros são aplicados aos argumentos na chamada. O valor de retorno não tem anotação de tipo; se precisar de um tipo específico, atribua-o a uma variável tipada.
+- Funções são globais e podem ser chamadas antes da declaração.
+- Parâmetros aceitam anotação de tipo opcional; a conversão é aplicada no momento da chamada.
+- `return` sem valor encerra a função.
+- A função não declara o tipo de retorno: o valor devolvido mantém o tipo da expressão.
+- Se precisar de um tipo específico no retorno, atribua a uma variável tipada:
 
-## Controle de fluxo
+```velv
+func Metade(valor : Float)
+{
+    return valor / 2;
+}
+
+var metade : Float = Metade(9);
+```
+
+Chamadas aninhadas são permitidas até 64 níveis.
+
+---
+
+## 6. Controle de fluxo
+
+### if / else
 
 ```velv
 if (vida > 0)
@@ -88,36 +156,97 @@ else
 {
     console.show("Derrotado");
 }
+```
 
+A condição pode ser escrita com ou sem parênteses. Também existe `else if`:
+
+```velv
+if (vida >= 70)
+{
+    console.show("Forte");
+}
+else if (vida >= 30)
+{
+    console.show("Ferido");
+}
+else
+{
+    console.show("Crítico");
+}
+```
+
+### while
+
+```velv
+var contador = 0;
 while (contador < 10)
 {
     contador += 1;
 }
 ```
 
-`if` e `while` aceitam condição com ou sem parênteses. Existe `else if` (um `if` dentro do `else`). Não há `for` nesta versão.
+Nesta versão não existe `for`. Use `while` com um contador ou percorra posições conhecidas.
 
-## Operadores
+Para evitar travamentos, um `while` pode executar no máximo **500.000 iterações por quadro**. Ao atingir o limite, o Play é interrompido com uma mensagem de erro.
+
+---
+
+## 7. Operadores
 
 | Categoria | Operadores |
 | --- | --- |
 | Aritmética | `+` `-` `*` `/` `%` |
 | Comparação | `==` `!=` `<` `<=` `>` `>=` |
-| Lógica | `&&` `\|\|` `!` (ou `and`, `or`, `not`) |
+| Lógica | `&&` `\|\|` `!` — ou `and`, `or`, `not` |
 | Agrupamento | `( ... )` |
 
-Valores considerados falsos: `false`, `0`, `""`, `null` e vetores de magnitude zero. Qualquer outro valor é verdadeiro. Dois vetores são iguais quando seus componentes são iguais; um vetor pode ser somado, subtraído, multiplicado ou dividido por outro vetor e multiplicado/dividido por um número.
+### Valores verdadeiros e falsos
 
-## Ciclo de vida
+São considerados falsos:
+
+- `false`
+- `0`
+- `""` (texto vazio)
+- `null`
+- vetores de magnitude zero
+
+Qualquer outro valor é verdadeiro.
+
+### Vetores
+
+Dois vetores são iguais quando todos os componentes são iguais. Um vetor pode ser:
+
+- somado, subtraído, multiplicado ou dividido por outro vetor;
+- multiplicado ou dividido por um número.
+
+```velv
+var a = new.Vector3(1, 0, 0);
+var b = new.Vector3(0, 1, 0);
+var soma = a + b;          # (1, 1, 0)
+var deslocamento = a * 6;  # (6, 0, 0)
+```
+
+---
+
+## 8. Ciclo de vida
 
 | Função | Quando roda |
 | --- | --- |
 | `func Main()` | uma vez, ao iniciar o Play |
 | `func InGame()` | a cada quadro, enquanto o Play estiver ativo |
 
-`Main()` é obrigatória para iniciar o jogo. `InGame()` é opcional. Se ocorrer um erro durante o `InGame()`, o Play é encerrado e a mensagem aparece no console de saída.
+Em um componente **Script**, `this` é o ator dono do script. Vários atores podem usar o mesmo arquivo — cada um recebe seu próprio `this`.
 
-## APIs da Engine
+Ordem de execução em cada quadro:
+
+1. Script de entrada (`Main.velv`).
+2. Componentes de script dos atores.
+3. Componentes nativos (como `Rotator`).
+4. Física, colisões e triggers.
+
+---
+
+## 9. APIs da Engine
 
 ### console
 
@@ -127,6 +256,8 @@ console.warn("atenção");
 console.error("falhou");
 ```
 
+As mensagens aparecem no painel **Saída** do editor e no console do executor headless.
+
 ### game
 
 ```velv
@@ -135,13 +266,13 @@ var direcao = game.get_input_vectors("direita", "esquerda", "baixo", "cima");
 var atacando = game.get_input("atacar");
 ```
 
-`get_input_vectors` devolve um `Vector2` com `x` e `y` entre `-1` e `1`. A ordem documentada é: positivo X, negativo X, positivo Y, negativo Y. Os nomes são reconhecidos por significado (`direita`/`right`, `esquerda`/`left`, `cima`/`up`/`frente`, `baixo`/`down`/`trás`), então a ordem não muda o resultado.
+`get_input_vectors(...)` devolve um `Vector2` com `x` e `y` entre `-1` e `1`. A ordem documentada é: positivo X, negativo X, positivo Y, negativo Y. Os nomes são reconhecidos por significado (`direita`/`right`, `esquerda`/`left`, `cima`/`up`/`frente`, `baixo`/`down`/`trás`), então a ordem não altera o resultado.
 
-`get_input("ação")` devolve `true` enquanto alguma tecla mapeada para a ação estiver pressionada. Use o nome exato da ação criada em **Project Settings → Entradas**. Se a ação não existir, os nomes de direção continuam caindo no padrão **WASD** e **setas**.
+`get_input("ação")` devolve `true` enquanto alguma tecla mapeada para a ação estiver pressionada. Use o nome exato criado em **Configurações do projeto → Entradas**. Se a ação não existir, os nomes de direção continuam caindo no padrão **WASD** e **setas**.
 
-### Inputs personalizados
+### Entradas personalizadas
 
-As ações são definidas no projeto (`<Projeto>.velvxproj`, campo `inputs`), não no script. Abra **Project Settings** (`Ctrl+,`) → aba **Entradas**, clique em **Adicionar entrada**, escolha o nome e as teclas (ex.: `Q`, `Espace`, `LeftShift`, `F5`) e salve. O script então usa:
+As ações são definidas no projeto (`<Projeto>.velvxproj`, campo `inputs`), não no script. Abra **Configurações do projeto** (`Ctrl+,`) → aba **Entradas**, clique em **Adicionar entrada**, escolha o nome e as teclas (por exemplo `Q`, `Espace`, `LeftShift`, `F5`) e salve.
 
 ```velv
 func InGame()
@@ -158,11 +289,11 @@ func InGame()
 }
 ```
 
-O editor valida o nome da ação e avisa quando ele não existe. Teclas aceitas incluem letras (`A`–`Z`), números, setas, `Espace`/`Space`, `Enter`, `Shift`, `Ctrl`, `Alt`, `Tab`, `Backspace` e `F1`–`F12`.
+Teclas aceitas incluem letras (`A`–`Z`), números, setas, `Espace`/`Space`, `Enter`, `Shift`, `Ctrl`, `Alt`, `Tab`, `Backspace` e `F1`–`F12`.
 
 ### this
 
-`this` representa o objeto dono do script. No script de entrada (`EntryScript`) ou em um componente de script, `this` é o objeto ao qual o script foi associado — o jogador, no caso da entrada.
+`this` representa o ator dono do script. No script de entrada ou em um componente de script, `this` é o ator ao qual o script foi associado — o jogador, no caso da entrada.
 
 ```velv
 this.position = new.Vector3(0, 2, 0);
@@ -170,29 +301,17 @@ this.visible = false;
 this.CharacterBody3D.velocity = new.Vector3(6, 0, 0);
 ```
 
-Todo objeto expõe `id`, `name`, `position`, `rotation`, `scale`, `visible` e `tag`. O componente `CharacterBody3D`/`CharacterBody2D` expõe `velocity`, `position` e `on_ground`. A `velocity` do componente é integrada à posição do jogador a cada quadro (a Engine cuida do movimento).
-
-### Componentes
-
-Cada objeto pode ter componentes adicionados pelo inspetor (**+ Componente**):
-
-| Componente | O que faz |
-| --- | --- |
-| `Script` | executa um arquivo `.velv` com `Main()` e `InGame()` no escopo do objeto |
-| `Rotator` | gira o objeto continuamente em torno de um eixo, na velocidade configurada |
-| `PointLight` | adiciona uma luz pontual ao objeto, com intensidade e alcance |
-
-Componentes de script rodam depois do script de entrada (`Main.velv`) e antes dos componentes nativos, todos no mesmo quadro. Vários objetos podem usar o mesmo arquivo de script — cada instância tem o seu próprio `this`.
+Todo ator expõe `id`, `name`, `position`, `rotation`, `scale`, `visible` e `tag`. O componente `CharacterBody3D`/`CharacterBody2D` expõe `velocity`, `position` e `on_ground`. A `velocity` do componente é integrada à posição do jogador a cada quadro pela Engine.
 
 ### Scene
 
 ```velv
 var cena = Scene("Main");
-var objeto = cena.object.Pilar;      # pelo nome do objeto
-var outro = Scene("Main").object.player;  # pelo id (sem diferenciar maiúsculas)
+var objeto = cena.object.Pilar;          # pelo nome do ator
+var outro = Scene("Main").object.player; # pelo id (sem diferenciar maiúsculas)
 ```
 
-`Scene(nome)` devolve a cena ativa; `object` é a raiz da cena e cada objeto aparece nela pelo **nome** ou pelo **id**. Todo objeto expõe `id`, `position`, `rotation`, `scale` e `visible`.
+`Scene(nome)` devolve a cena ativa; `object` é a raiz da cena e cada ator aparece nela pelo **nome** ou pelo **id**.
 
 ### Streaming de cenas
 
@@ -225,7 +344,7 @@ func InGame()
 }
 ```
 
-Cada cena mantém seu próprio arquivo `.scene.json` em `Scenes/` e o nome usado no script é o nome do arquivo, sem extensão. A cena ativa é a que o `this` do script de entrada enxerga e a que os comandos de direção movimentam.
+Cada cena mantém seu próprio arquivo `.scene.json` em `Scenes/`. O nome usado no script é o nome do arquivo, sem extensão. A cena ativa é a que o `this` do script de entrada enxerga e a que recebe os comandos de direção.
 
 O gerenciador global `Scenes` oferece as mesmas operações por nome:
 
@@ -248,7 +367,7 @@ var objeto2 = Assets.pathObject("Objetos/Caixa");   # procura pelo último segme
 objeto.position = new.Vector3(0, 3, 0);
 ```
 
-Se o objeto não existir, é devolvido um objeto temporário com `position` e `visible`, para que o script continue rodando.
+Se o ator não existir, é devolvido um objeto temporário com `position` e `visible`, para que o script continue rodando.
 
 ### Vetores
 
@@ -263,10 +382,61 @@ var deslocamento = new.Vector3(1, 0, 0) * 6;
 b.x += 1;
 ```
 
-## Exemplo completo
+---
+
+## 10. Componentes e colisão
+
+Cada ator pode receber componentes pelo inspetor (**+ Componente**):
+
+| Componente | O que faz |
+| --- | --- |
+| `Script` | executa um arquivo `.velv` com `Main()` e `InGame()` no escopo do ator |
+| `Rotator` | gira o ator continuamente em torno de um eixo |
+| `PointLight` | adiciona uma luz pontual ao ator |
+| `Rigidbody` | aplica gravidade e velocidade ao ator |
+| `CharacterBody` | corpo controlado por script (jogador) |
+| `StaticBody` | corpo imóvel que participa de colisões |
+| `BoxCollider` / `SphereCollider` | colisão por forma geométrica |
+| `MeshCollider` | deriva a colisão das dimensões do modelo importado, sem desenhar a caixa manualmente |
+
+Atores com **CharacterBody3D**, **CharacterBody2D** ou o componente **CharacterBody** colidem com **StaticBody3D** e com atores que tenham `BoxCollider`, `SphereCollider` ou `MeshCollider` sem **Trigger**. Triggers continuam disparando `OnTriggerEnter`, `OnTriggerStay` e `OnTriggerExit` nos scripts.
 
 ```velv
-# Script de entrada do jogador 2D.
+func OnTriggerEnter(outro)
+{
+    console.show("Entrou: {outro.name}");
+}
+
+func OnTriggerExit(outro)
+{
+    console.show("Saiu: {outro.name}");
+}
+```
+
+As camadas do projeto controlam quais pares colidem (**Configurações do projeto → Camadas**).
+
+---
+
+## 11. Exemplos completos
+
+### Jogador 3D
+
+```velv
+func Main()
+{
+    console.show("Use WASD para andar.");
+}
+
+func InGame()
+{
+    var direcao = game.get_input_vectors("direita", "esquerda", "cima", "baixo");
+    this.CharacterBody3D.velocity = new.Vector3(direcao.x * 5, 0, direcao.y * 5);
+}
+```
+
+### Jogador 2D com objeto girando
+
+```velv
 func Main()
 {
     console.show("VelvX 2D pronta. Use WASD ou as setas.");
@@ -282,13 +452,40 @@ func InGame()
 }
 ```
 
-## Limites e diagnóstico
+### Contador com while
 
-- Profundidade máxima de chamadas: 64.
-- Um `while` pode executar no máximo 500.000 iterações por quadro.
-- Erros trazem linha, coluna e uma mensagem amigável no painel **Saída** do editor.
-- O interpretador não compila para código nativo nesta versão; ele executa a árvore sintática.
+```velv
+func Main()
+{
+    var numero = 1;
+    while (numero <= 5)
+    {
+        console.show("Contagem: {numero}");
+        numero += 1;
+    }
+}
+```
 
-## Ainda não disponível
+---
 
-Arrays/listas com indexação, `for`, classes/tipos personalizados, funções anônimas, `switch`, importação de módulos, física e colisões, áudio, controle de animação por script (modelos 3D já tocam animações embutidas), câmera de jogo dedicada e salvamento de estado. Essas peças entram nas próximas etapas da Engine.
+## 12. Limites e diagnóstico
+
+- Profundidade máxima de chamadas: **64**.
+- Um `while` pode executar no máximo **500.000 iterações por quadro**.
+- Erros trazem linha, coluna e uma mensagem amigável no painel **Saída**.
+- O interpretador executa a árvore sintática; não há compilação para código nativo nesta versão.
+
+Mensagens de erro comuns:
+
+| Mensagem | Causa provável |
+| --- | --- |
+| `Variável não declarada` | nome digitado errado ou fora do escopo |
+| `Esperado ';'` | falta de ponto e vírgula ao final da instrução |
+| `Chamada muito profunda` | recursão sem condição de parada |
+| `Ação de entrada não encontrada` | nome diferente do cadastrado nas Configurações |
+
+---
+
+## 13. Ainda não disponível
+
+Arrays/listas com indexação, `for`, classes e tipos personalizados, funções anônimas, `switch`, importação de módulos, áudio por script, animação controlada por script (modelos 3D já tocam animações embutidas), câmera de jogo dedicada e salvamento de estado. Essas peças entram nas próximas etapas da Engine.

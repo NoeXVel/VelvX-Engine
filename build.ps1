@@ -11,7 +11,7 @@ $dist = Join-Path $root "dist"
 $output = Join-Path $dist "VelvX-Engine-$Runtime"
 $zip = "$output.zip"
 
-$version = "0.3.0"
+$version = "0.4.0"
 $match = [regex]::Match((Get-Content $project -Raw), "<Version>([^<]+)</Version>")
 if ($match.Success) { $version = $match.Groups[1].Value }
 
@@ -62,25 +62,24 @@ VelvX Engine $version - Bigorna
 2. Execute VelvX.Engine.exe.
 3. Crie um projeto em Novo projeto: 3D, 2D, Vazio 3D ou Vazio 2D.
 
-Novidades da 0.3.0:
-  - GameObject + Transform e componentes obrigatorios;
-  - setas coloridas seguindo o objeto e selecao pelo viewport;
-  - camera nativa editavel (FOV, near, far e camera principal);
-  - janela grande de script com autocomplete, auto-indent e referencia;
-  - fisica simples, rigidbody, colliders e triggers OnTriggerEnter/Stay/Exit;
-  - hierarquia por script (parent, children, find_child) e camadas;
-  - scripts globais e scripts por objeto;
-  - escala e textura por modelo 3D;
-  - templates Vazio 3D/Vazio 2D sem objetos de exemplo;
-  - textos de botoes sem corte e recursos com icones e arrastar-soltar.
+Novidades da 0.4.0 (Fix):
+  - gizmos de mover, girar e escalar com atalhos 1, 2 e 3;
+  - movimento livre no viewport 3D e hierarquia que segue o pai;
+  - escala de modelos corrigida, com ou sem rig;
+  - inspetor redesenhado e atores com LOD e distancia de renderizacao;
+  - primitivas 3D, MeshCollider automatico e StaticBody com colisao;
+  - materiais reutilizaveis com textura, emissao, brilho e opacidade;
+  - efeitos visuais pulsantes nos Box Volumes e luz pontual aprimorada;
+  - documentacao completa da VelvX Language dentro do editor.
 
 Teclas no editor:
   F5 ........ iniciar o jogo
   Esc ....... parar o jogo
   Ctrl+S .... salvar o projeto
   Ctrl+, .... abrir Configuracoes do Projeto
-  F ......... focar o objeto selecionado
+  F ......... focar o ator selecionado
   WASD ...... mover a camera 3D no editor
+  1 / 2 / 3 . alternar gizmo de mover, girar e escalar
   Setas ..... mover o Player durante o Play
 
 Seus projetos ficam em Documentos\VelvX Projects.

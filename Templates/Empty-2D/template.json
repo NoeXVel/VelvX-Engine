@@ -3,5 +3,5 @@
   "name": "Vazio 2D",
   "description": "Projeto 2D limpo, sem objetos de exemplo: apenas a câmera do jogo e o script de entrada.",
   "mode": "2D",
-  "version": "0.3.0"
+  "version": "0.4.0"
 }

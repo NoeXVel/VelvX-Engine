@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using VelvX.Engine.Core;
 using VelvX.Engine.Runtime;
@@ -22,6 +23,7 @@ public partial class ProjectSettingsWindow : Window
     private readonly ObservableCollection<string> _layers;
     private readonly ObservableCollection<string> _globalScripts;
     private bool _updating;
+    private bool _listening;
     private string _currentPage = "general";
 
     public ProjectSettingsWindow(GameProject project, SceneDocument scene)
@@ -116,6 +118,7 @@ public partial class ProjectSettingsWindow : Window
 
     private void ShowPage(string page)
     {
+        StopListening();
         _currentPage = page;
         var pages = new Dictionary<string, (FrameworkElement Panel, Button Button)>
         {
@@ -136,6 +139,7 @@ public partial class ProjectSettingsWindow : Window
 
     private void InputList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        StopListening();
         _updating = true;
         try
         {
@@ -171,11 +175,79 @@ public partial class ProjectSettingsWindow : Window
 
     private void ActionKeys_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_updating || InputList.SelectedItem is not InputAction action) return;
+        if (_updating || _listening || InputList.SelectedItem is not InputAction action) return;
         action.Keys = ActionKeysBox.Text
             .Split([',', ';', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private void ListenKeys_Click(object sender, RoutedEventArgs e)
+    {
+        if (InputList.SelectedItem is not InputAction action)
+        {
+            StatusLabel.Text = "Selecione uma ação antes de escutar uma tecla.";
+            return;
+        }
+
+        if (_listening)
+        {
+            StopListening();
+            return;
+        }
+
+        _listening = true;
+        ListenHint.Visibility = Visibility.Visible;
+        ListenKeysButton.Content = "Aguardando…";
+        StatusLabel.Text = $"Pressione a tecla para '{action.Name}'. Esc cancela.";
+        ActionKeysBox.Focus();
+    }
+
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!_listening) return;
+
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        e.Handled = true;
+
+        if (key == Key.Escape)
+        {
+            StopListening();
+            StatusLabel.Text = "Captura de tecla cancelada.";
+            return;
+        }
+
+        if (key is Key.None or Key.ImeProcessed or Key.DeadCharProcessed) return;
+        if (InputList.SelectedItem is not InputAction action) return;
+
+        var display = InputKeys.Display(key);
+        var keys = ActionKeysBox.Text
+            .Split([',', ';', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+        if (!keys.Contains(display, StringComparer.OrdinalIgnoreCase))
+            keys.Add(display);
+
+        _updating = true;
+        try
+        {
+            ActionKeysBox.Text = string.Join(", ", keys);
+        }
+        finally
+        {
+            _updating = false;
+        }
+
+        action.Keys = keys;
+        StopListening();
+        StatusLabel.Text = $"Tecla '{display}' adicionada à ação '{action.Name}'.";
+    }
+
+    private void StopListening()
+    {
+        if (!_listening) return;
+        _listening = false;
+        ListenHint.Visibility = Visibility.Collapsed;
+        ListenKeysButton.Content = "Escutar tecla";
     }
 
     private void AddInput_Click(object sender, RoutedEventArgs e)
@@ -246,10 +318,10 @@ public partial class ProjectSettingsWindow : Window
                 BackgroundBottomBox.Text = "#69737F";
                 break;
             default:
-                AmbientBox.Text = "#5E6078";
-                AmbientIntensityBox.Text = "1";
-                SunColorBox.Text = "#FFF4E2";
-                SunIntensityBox.Text = "1";
+                AmbientBox.Text = "#6A6E8A";
+                AmbientIntensityBox.Text = "1.1";
+                SunColorBox.Text = "#FFF1DA";
+                SunIntensityBox.Text = "1.25";
                 SunYawBox.Text = "-38";
                 SunPitchBox.Text = "-52";
                 BackgroundTopBox.Text = "#0A0B10";

@@ -115,6 +115,44 @@
     </Setter>
   </Style>
 
+  <Style x:Key="GizmoTool" TargetType="Button">
+    <Setter Property="Foreground" Value="#B9B3CB" />
+    <Setter Property="FontFamily" Value="Segoe UI" />
+    <Setter Property="FontSize" Value="10.5" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Padding" Value="11,6" />
+    <Setter Property="Background" Value="#1A1D26" />
+    <Setter Property="BorderBrush" Value="#2A2D38" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Root" Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="6" Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Root" Property="Background" Value="#272B38" />
+              <Setter TargetName="Root" Property="BorderBrush" Value="#4A3F6B" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Root" Property="Opacity" Value="0.4" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="GizmoToolActive" TargetType="Button" BasedOn="{StaticResource GizmoTool}">
+    <Setter Property="Foreground" Value="#F1ECFF" />
+    <Setter Property="Background" Value="#2B2342" />
+    <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+  </Style>
+
   <Style x:Key="NavButton" TargetType="Button">
     <Setter Property="HorizontalContentAlignment" Value="Left" />
     <Setter Property="Foreground" Value="#A5A7B2" />
@@ -152,6 +190,57 @@
         </ControlTemplate>
       </Setter.Value>
     </Setter>
+  </Style>
+
+  <!-- Abas do workspace -->
+  <Style x:Key="WorkspaceTab" TargetType="Button">
+    <Setter Property="Foreground" Value="#8E92A2" />
+    <Setter Property="FontFamily" Value="Segoe UI" />
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Padding" Value="15,8" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Root" Background="Transparent" BorderBrush="Transparent"
+                  BorderThickness="0,0,0,2" Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter Property="Foreground" Value="#D6D1E4" />
+              <Setter TargetName="Root" Property="Background" Value="#171A22" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="WorkspaceTabActive" TargetType="Button" BasedOn="{StaticResource WorkspaceTab}">
+    <Setter Property="Foreground" Value="#EDE9FF" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border Background="#181423" BorderBrush="{StaticResource Accent}"
+                  BorderThickness="0,0,0,2" Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="PanelTab" TargetType="Button" BasedOn="{StaticResource WorkspaceTab}">
+    <Setter Property="Padding" Value="11,6" />
+    <Setter Property="FontSize" Value="10.5" />
+  </Style>
+
+  <Style x:Key="PanelTabActive" TargetType="Button" BasedOn="{StaticResource WorkspaceTabActive}">
+    <Setter Property="Padding" Value="11,6" />
+    <Setter Property="FontSize" Value="10.5" />
   </Style>
 
   <!-- Cartão de template -->
@@ -404,8 +493,64 @@
   <Style TargetType="TreeViewItem">
     <Setter Property="Foreground" Value="#D8D4E4" />
     <Setter Property="FontSize" Value="11.5" />
-    <Setter Property="Padding" Value="2,2" />
+    <Setter Property="Padding" Value="4,3" />
     <Setter Property="IsExpanded" Value="False" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TreeViewItem">
+          <StackPanel>
+            <Border x:Name="Row" Background="Transparent" CornerRadius="5" Padding="{TemplateBinding Padding}">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="16" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ToggleButton x:Name="Expander" Width="14" Height="14" Focusable="False"
+                              IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
+                              ClickMode="Press">
+                  <ToggleButton.Template>
+                    <ControlTemplate TargetType="ToggleButton">
+                      <Border Background="Transparent">
+                        <TextBlock x:Name="Arrow" Text="▸" FontSize="9" Foreground="#8B8FA0"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="Arrow" Property="Text" Value="▾" />
+                          <Setter TargetName="Arrow" Property="Foreground" Value="#C9B8FF" />
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </ToggleButton.Template>
+                </ToggleButton>
+                <ContentPresenter x:Name="PART_Header" Grid.Column="1" ContentSource="Header"
+                                  VerticalAlignment="Center" HorizontalAlignment="Stretch" />
+              </Grid>
+            </Border>
+            <ItemsPresenter x:Name="ItemsHost" Margin="14,0,0,0" />
+          </StackPanel>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsExpanded" Value="False">
+              <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed" />
+            </Trigger>
+            <Trigger Property="HasItems" Value="False">
+              <Setter TargetName="Expander" Property="Visibility" Value="Hidden" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="Row" Property="Background" Value="#2A2340" />
+            </Trigger>
+            <MultiTrigger>
+              <MultiTrigger.Conditions>
+                <Condition Property="IsSelected" Value="False" />
+                <Condition Property="IsMouseOver" Value="True" />
+              </MultiTrigger.Conditions>
+              <Setter TargetName="Row" Property="Background" Value="#1B1E27" />
+            </MultiTrigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
   </Style>
 
   <!-- Dica -->

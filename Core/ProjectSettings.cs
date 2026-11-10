@@ -60,10 +60,10 @@ public sealed class RenderSettings
 /// <summary>Iluminação e fundo de uma cena 3D, editáveis no Project Settings.</summary>
 public sealed class EnvironmentSettings
 {
-    public string Ambient { get; set; } = "#5E6078";
-    public double AmbientIntensity { get; set; } = 1.0;
-    public string SunColor { get; set; } = "#FFF4E2";
-    public double SunIntensity { get; set; } = 1.0;
+    public string Ambient { get; set; } = "#6A6E8A";
+    public double AmbientIntensity { get; set; } = 1.1;
+    public string SunColor { get; set; } = "#FFF1DA";
+    public double SunIntensity { get; set; } = 1.25;
     public double SunYaw { get; set; } = -38;
     public double SunPitch { get; set; } = -52;
     public string BackgroundTop { get; set; } = "#0A0B10";
@@ -121,8 +121,11 @@ public sealed class ComponentData
     public double NearPlane { get; set; } = 0.2;
     public double FarPlane { get; set; } = 1200;
     public string LayerMask { get; set; } = "*";
+    public bool Convex { get; set; } = true;
     public double Volume { get; set; } = 1;
     public bool Loop { get; set; } = true;
+    public double Lifetime { get; set; } = 1.5;
+    public double ParticleSize { get; set; } = 0.15;
 
     public ComponentData Clone() => new()
     {
@@ -144,8 +147,11 @@ public sealed class ComponentData
         NearPlane = NearPlane,
         FarPlane = FarPlane,
         LayerMask = LayerMask,
+        Convex = Convex,
         Volume = Volume,
-        Loop = Loop
+        Loop = Loop,
+        Lifetime = Lifetime,
+        ParticleSize = ParticleSize
     };
 
     public string DisplayName => Type switch
@@ -160,8 +166,12 @@ public sealed class ComponentData
         "MeshRenderer" => "Mesh Renderer",
         "BoxCollider" => "Collider de caixa",
         "SphereCollider" => "Collider de esfera",
+        "MeshCollider" => "Mesh Collider",
+        "StaticBody" => "Static Body",
         "Rigidbody" => "Rigidbody",
         "AudioSource" => "Audio Source",
+        "CharacterBody" => "CharacterBody",
+        "ParticleEmitter" => "Emissor de partículas",
         _ => Type
     };
 }

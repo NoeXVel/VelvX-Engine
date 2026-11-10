@@ -14,6 +14,7 @@ using ICSharpCode.AvalonEdit;
 using Microsoft.Win32;
 using VelvX.Engine.Core;
 using VelvX.Engine.Language;
+using VelvX.Engine.Rendering;
 using VelvX.Engine.Runtime;
 using VelvX.Engine.Theme;
 
@@ -31,7 +32,6 @@ public partial class EditorWindow : Window
 
     private readonly ObservableCollection<ConsoleEntry> _console = [];
     private readonly Stopwatch _frameClock = new();
-    private List<SceneObject> _hierarchyItems = [];
 
     private GameProject? _project;
     private SceneDocument? _scene;
@@ -56,7 +56,9 @@ public partial class EditorWindow : Window
     private Point _dragStartPoint;
     private SceneObject? _dragObject;
     private TreeViewItem? _dragResource;
-    private bool _helpVisible;
+    private readonly HashSet<string> _expandedHierarchy = new(StringComparer.OrdinalIgnoreCase);
+    private List<HierarchyNode> _hierarchyRoots = [];
+    private string _workspace = "scene";
 
     public EditorWindow()
     {
@@ -68,11 +70,16 @@ public partial class EditorWindow : Window
         BuildAddObjectMenu();
         BuildAddComponentMenu();
         BuildResourceNewMenu();
+        ShowWorkspace("scene");
 
         View3D.ObjectSelected += id => SelectObjectById(id);
         View2D.ObjectSelected += id => SelectObjectById(id);
         View3D.TransformChanged += OnTransformChanged;
         View2D.TransformChanged += OnTransformChanged;
+        View3D.GizmoModeChanged += _ => UpdateGizmoToolbar();
+        View3D.RenderStatsChanged += (visible, total) =>
+            ActorStatsText.Text = $"Atores visíveis agora: {visible} de {total}";
+        UpdateGizmoToolbar();
     }
 
     public EditorWindow(GameProject project) : this()
@@ -125,11 +132,12 @@ func InGame()
         ViewportModeText.Text = ModeBadgeText.Text;
         View3D.Visibility = is3D ? Visibility.Visible : Visibility.Collapsed;
         View2D.Visibility = is3D ? Visibility.Collapsed : Visibility.Visible;
+        GizmoToolbar.Visibility = is3D ? Visibility.Visible : Visibility.Collapsed;
         PosZPanel.Visibility = is3D ? Visibility.Visible : Visibility.Collapsed;
         ScaleZField.Visibility = is3D ? Visibility.Visible : Visibility.Collapsed;
         ViewportHintText.Text = is3D
-            ? "WASD mover · botão direito orbitar · setas coloridas movem o objeto"
-            : "WASD mover a vista · botão direito mover · setas coloridas movem o objeto";
+            ? "WASD mover · botão direito orbitar · 1/2/3 alternam mover, girar e escalar · centro do gizmo move livre"
+            : "WASD mover a vista · botão direito mover · 1/2/3 alternam mover, girar e escalar · centro do gizmo move livre";
 
         View3D.ResolveAsset = path => project.ResolveAsset(path);
         View2D.ResolveAsset = path => project.ResolveAsset(path);
@@ -152,12 +160,15 @@ func InGame()
         RefreshSceneSelector();
         LoadSceneIntoViews();
         RefreshHierarchy();
-        SelectObject(_scene.Objects.FirstOrDefault(item => item.Type is "CharacterBody3D" or "CharacterBody2D")
+        SelectObject(_scene.Objects.FirstOrDefault(item => item.HasComponent("CharacterBody"))
+                     ?? _scene.Objects.FirstOrDefault(item => item.Type is "CharacterBody3D" or "CharacterBody2D")
                      ?? _scene.Objects.FirstOrDefault());
         BuildResourceTree();
         UpdateCaretStatus();
         SetDirty(false);
         SetScriptDirty(false);
+        ShowWorkspace("scene");
+        UpdateWorkspaceInfo();
         AddConsole($"Projeto '{project.Info.Name}' carregado. VelvX Engine {EnginePaths.Version} pronta.", ScriptLogLevel.Info);
     }
 
@@ -182,6 +193,7 @@ func InGame()
         var is3D = _project.Is3D;
         View3D.Visibility = is3D ? Visibility.Visible : Visibility.Collapsed;
         View2D.Visibility = is3D ? Visibility.Collapsed : Visibility.Visible;
+        GizmoToolbar.Visibility = is3D ? Visibility.Visible : Visibility.Collapsed;
         PosZPanel.Visibility = is3D ? Visibility.Visible : Visibility.Collapsed;
         ScaleZField.Visibility = is3D ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -377,24 +389,104 @@ func InGame()
         {
             var targetId = selectId ?? _selected?.Id;
             var filter = HierarchySearchBox.Text.Trim();
-            _hierarchyItems = _scene.Objects
-                .Where(item => string.IsNullOrWhiteSpace(filter) ||
-                               item.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                               item.Type.Contains(filter, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            _hierarchyRoots = string.IsNullOrWhiteSpace(filter)
+                ? BuildHierarchyTree()
+                : _scene.Objects
+                    .Where(item => item.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                                   item.Type.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                    .Select(item => new HierarchyNode(item) { IsExpanded = true })
+                    .ToList();
 
             HierarchyList.ItemsSource = null;
-            HierarchyList.ItemsSource = _hierarchyItems;
-            HierarchyCountText.Text = $"{_scene.Objects.Count} objeto{(_scene.Objects.Count == 1 ? "" : "s")}";
+            HierarchyList.ItemsSource = _hierarchyRoots;
+            HierarchyCountText.Text = $"{_scene.Objects.Count} ator{(_scene.Objects.Count == 1 ? "" : "es")}";
             HierarchySearchHint.Visibility = string.IsNullOrEmpty(filter) ? Visibility.Visible : Visibility.Collapsed;
 
-            var target = targetId is null ? null : _hierarchyItems.FirstOrDefault(item =>
-                string.Equals(item.Id, targetId, StringComparison.OrdinalIgnoreCase));
-            HierarchyList.SelectedItem = target;
+            var target = FindHierarchyNode(_hierarchyRoots, targetId);
+            if (target is not null) ExpandHierarchyAncestors(_hierarchyRoots, target);
+            SetHierarchySelection(_hierarchyRoots, target);
         }
         finally
         {
             _refreshingHierarchy = false;
+        }
+
+        UpdateWorkspaceInfo();
+    }
+
+    private List<HierarchyNode> BuildHierarchyTree()
+    {
+        if (_scene is null) return [];
+
+        var nodes = new Dictionary<string, HierarchyNode>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in _scene.Objects)
+            nodes[item.Id] = new HierarchyNode(item) { IsExpanded = _expandedHierarchy.Contains(item.Id) };
+
+        var roots = new List<HierarchyNode>();
+        foreach (var item in _scene.Objects)
+        {
+            var node = nodes[item.Id];
+            if (!string.IsNullOrWhiteSpace(item.ParentId) &&
+                nodes.TryGetValue(item.ParentId, out var parent) &&
+                !ReferenceEquals(parent, node) &&
+                !HierarchyCreatesCycle(nodes, item, item.ParentId))
+            {
+                parent.Children.Add(node);
+            }
+            else
+            {
+                roots.Add(node);
+            }
+        }
+
+        foreach (var root in roots) root.IsExpanded = true;
+        return roots;
+    }
+
+    private static bool HierarchyCreatesCycle(IReadOnlyDictionary<string, HierarchyNode> nodes, SceneObject item, string parentId)
+    {
+        var current = parentId;
+        var guard = 0;
+        while (!string.IsNullOrWhiteSpace(current) && guard++ < 128)
+        {
+            if (string.Equals(current, item.Id, StringComparison.OrdinalIgnoreCase)) return true;
+            current = nodes.TryGetValue(current, out var parent) ? parent.Object.ParentId : null;
+        }
+        return false;
+    }
+
+    private static HierarchyNode? FindHierarchyNode(IEnumerable<HierarchyNode> nodes, string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return null;
+        foreach (var node in nodes)
+        {
+            if (string.Equals(node.Object.Id, id, StringComparison.OrdinalIgnoreCase)) return node;
+            var child = FindHierarchyNode(node.Children, id);
+            if (child is not null) return child;
+        }
+        return null;
+    }
+
+    private static bool ExpandHierarchyAncestors(IEnumerable<HierarchyNode> nodes, HierarchyNode target)
+    {
+        foreach (var node in nodes)
+        {
+            if (ReferenceEquals(node, target)) return true;
+            if (ExpandHierarchyAncestors(node.Children, target))
+            {
+                node.IsExpanded = true;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void SetHierarchySelection(IEnumerable<HierarchyNode> nodes, HierarchyNode? selected)
+    {
+        foreach (var node in nodes)
+        {
+            node.IsSelected = ReferenceEquals(node, selected);
+            SetHierarchySelection(node.Children, selected);
         }
     }
 
@@ -415,17 +507,53 @@ func InGame()
         if (!_refreshingHierarchy)
         {
             _refreshingHierarchy = true;
-            HierarchyList.SelectedItem = item is not null && _hierarchyItems.Contains(item) ? item : null;
-            _refreshingHierarchy = false;
+            try
+            {
+                var node = FindHierarchyNode(_hierarchyRoots, item?.Id);
+                if (node is not null) ExpandHierarchyAncestors(_hierarchyRoots, node);
+                SetHierarchySelection(_hierarchyRoots, node);
+            }
+            finally
+            {
+                _refreshingHierarchy = false;
+            }
         }
 
         UpdateInspector();
+        UpdateWorkspaceInfo();
     }
 
-    private void Hierarchy_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void Hierarchy_SelectionChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (_refreshingHierarchy || _loading) return;
-        SelectObject(HierarchyList.SelectedItem as SceneObject);
+        SelectObject(e.NewValue is HierarchyNode node ? node.Object : null);
+    }
+
+    private void Hierarchy_Expanded(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is TreeViewItem { DataContext: HierarchyNode node })
+            _expandedHierarchy.Add(node.Object.Id);
+    }
+
+    private void Hierarchy_Collapsed(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is TreeViewItem { DataContext: HierarchyNode node })
+            _expandedHierarchy.Remove(node.Object.Id);
+    }
+
+    private void HierarchyList_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var node = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.DataContext as HierarchyNode;
+        if (node is not null) SelectObject(node.Object);
+    }
+
+    private void MakeRoot_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selected is null || _scene is null || _isPlaying) return;
+        _selected.ParentId = null;
+        SetDirty(true);
+        RefreshHierarchy(_selected.Id);
+        UpdateInspector();
     }
 
     private void FocusSelected_Click(object sender, RoutedEventArgs e)
@@ -439,6 +567,28 @@ func InGame()
     {
         View3D.ResetCamera();
         View2D.ResetView();
+    }
+
+    private void GizmoMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement element || element.Tag is not string tag) return;
+        View3D.SetGizmoMode(tag switch
+        {
+            "rotate" => GizmoMode.Rotate,
+            "scale" => GizmoMode.Scale,
+            _ => GizmoMode.Translate
+        });
+        UpdateGizmoToolbar();
+        View3D.Focus();
+    }
+
+    private void UpdateGizmoToolbar()
+    {
+        var active = (Style)FindResource("GizmoToolActive");
+        var normal = (Style)FindResource("GizmoTool");
+        GizmoTranslateButton.Style = View3D.GizmoMode == GizmoMode.Translate ? active : normal;
+        GizmoRotateButton.Style = View3D.GizmoMode == GizmoMode.Rotate ? active : normal;
+        GizmoScaleButton.Style = View3D.GizmoMode == GizmoMode.Scale ? active : normal;
     }
 
     private void InvalidateViews()
@@ -459,8 +609,8 @@ func InGame()
         {
             if (_selected is null)
             {
-                InspectorName.Text = "Nenhum objeto selecionado";
-                InspectorType.Text = "Selecione um objeto na hierarquia";
+                InspectorName.Text = "Nenhum ator selecionado";
+                InspectorType.Text = "Selecione um ator na hierarquia";
                 InspectorFields.Visibility = Visibility.Collapsed;
                 ComponentsPanel.Children.Clear();
                 return;
@@ -503,12 +653,37 @@ func InGame()
             LightPanel.Visibility = item.IsLight ? Visibility.Visible : Visibility.Collapsed;
             VolumePanel.Visibility = item.IsVolume ? Visibility.Visible : Visibility.Collapsed;
 
+            var particle = item.GetComponent("ParticleEmitter");
+            ParticlePanel.Visibility = particle is not null ? Visibility.Visible : Visibility.Collapsed;
+            if (particle is not null)
+            {
+                ParticleCountField.Text = FormatNumber(particle.Amount);
+                ParticleLifeField.Text = FormatNumber(particle.Lifetime);
+                ParticleSpeedField.Text = FormatNumber(particle.Speed);
+                ParticleSizeField.Text = FormatNumber(particle.ParticleSize);
+                ParticleColorField.Text = particle.Color;
+                ParticleGravityCheck.IsChecked = particle.UseGravity;
+            }
+
             ModelPathField.Text = item.Model ?? "";
             ModelScaleField.Text = FormatNumber(item.ModelScale);
             ModelTextureField.Text = item.ModelTexture ?? "";
+            MaterialField.Text = item.Material ?? "";
             AnimationField.Text = item.Animation ?? "";
             AnimationSpeedField.Text = FormatNumber(item.AnimationSpeed);
             AnimationLoopCheck.IsChecked = item.AnimationLoop;
+
+            var showActor = is3D && item.Type is not ("PointLight" or "DirectionalLight" or "Camera3D" or
+                "GlobalVolume" or "BoxVolume");
+            ActorPanel.Visibility = showActor ? Visibility.Visible : Visibility.Collapsed;
+            if (showActor)
+            {
+                LodEnabledCheck.IsChecked = item.LodEnabled;
+                LodDistanceField.Text = FormatNumber(item.LodDistance);
+                RenderDistanceField.Text = FormatNumber(item.RenderDistance);
+                LodDistanceField.IsEnabled = item.LodEnabled;
+                RenderDistanceField.IsEnabled = item.LodEnabled;
+            }
 
             FovField.Text = FormatNumber(item.Fov);
             NearField.Text = FormatNumber(item.NearPlane);
@@ -663,6 +838,7 @@ func InGame()
         {
             var model = ModelPathField.Text.Trim();
             var texture = ModelTextureField.Text.Trim();
+            var material = MaterialField.Text.Trim();
             var modelScale = Math.Max(0.01, ParseNumber(ModelScaleField.Text, item.ModelScale));
             var animation = AnimationField.Text.Trim();
             var speed = Math.Max(0.01, ParseNumber(AnimationSpeedField.Text, item.AnimationSpeed));
@@ -671,11 +847,17 @@ func InGame()
             if (!string.Equals(model, item.Model ?? "", StringComparison.OrdinalIgnoreCase))
             {
                 item.Model = string.IsNullOrWhiteSpace(model) ? null : model;
+                UpdateModelColliderBounds(item);
                 changed = true;
             }
             if (!string.Equals(texture, item.ModelTexture ?? "", StringComparison.OrdinalIgnoreCase))
             {
                 item.ModelTexture = string.IsNullOrWhiteSpace(texture) ? null : texture;
+                changed = true;
+            }
+            if (!string.Equals(material, item.Material ?? "", StringComparison.OrdinalIgnoreCase))
+            {
+                item.Material = string.IsNullOrWhiteSpace(material) ? null : material;
                 changed = true;
             }
             if (!NearlyEqual(modelScale, item.ModelScale))
@@ -736,6 +918,44 @@ func InGame()
             }
         }
 
+        if (ParticlePanel.Visibility == Visibility.Visible && item.GetComponent("ParticleEmitter") is { } particle)
+        {
+            var count = Math.Clamp(ParseNumber(ParticleCountField.Text, particle.Amount), 1, 600);
+            var life = Math.Max(0.1, ParseNumber(ParticleLifeField.Text, particle.Lifetime));
+            var speed = Math.Max(0, ParseNumber(ParticleSpeedField.Text, particle.Speed));
+            var size = Math.Max(0.01, ParseNumber(ParticleSizeField.Text, particle.ParticleSize));
+            var particleColor = ParticleColorField.Text.Trim();
+            var gravity = ParticleGravityCheck.IsChecked == true;
+            if (!NearlyEqual(count, particle.Amount) || !NearlyEqual(life, particle.Lifetime) ||
+                !NearlyEqual(speed, particle.Speed) || !NearlyEqual(size, particle.ParticleSize) ||
+                gravity != particle.UseGravity ||
+                (IsValidColor(particleColor) && !string.Equals(particleColor, particle.Color, StringComparison.OrdinalIgnoreCase)))
+            {
+                particle.Amount = count;
+                particle.Lifetime = life;
+                particle.Speed = speed;
+                particle.ParticleSize = size;
+                if (IsValidColor(particleColor)) particle.Color = particleColor;
+                particle.UseGravity = gravity;
+                changed = true;
+            }
+        }
+
+        if (ActorPanel.Visibility == Visibility.Visible)
+        {
+            var lodEnabled = LodEnabledCheck.IsChecked == true;
+            var lodDistance = Math.Max(1, ParseNumber(LodDistanceField.Text, item.LodDistance));
+            var renderDistance = Math.Max(lodDistance + 1, ParseNumber(RenderDistanceField.Text, item.RenderDistance));
+            if (lodEnabled != item.LodEnabled || !NearlyEqual(lodDistance, item.LodDistance) ||
+                !NearlyEqual(renderDistance, item.RenderDistance))
+            {
+                item.LodEnabled = lodEnabled;
+                item.LodDistance = lodDistance;
+                item.RenderDistance = renderDistance;
+                changed = true;
+            }
+        }
+
         if (!changed && !visibilityChanged) return;
 
         item.Name = name;
@@ -790,7 +1010,40 @@ func InGame()
 
     private void AnimationLoop_Click(object sender, RoutedEventArgs e) => ApplyInspector();
 
+    private void LodEnabled_Click(object sender, RoutedEventArgs e)
+    {
+        LodDistanceField.IsEnabled = LodEnabledCheck.IsChecked == true;
+        RenderDistanceField.IsEnabled = LodEnabledCheck.IsChecked == true;
+        ApplyInspector();
+    }
+
+    private void OpenMaterials_Click(object sender, RoutedEventArgs e)
+    {
+        if (_project is null || _selected is null || _isPlaying) return;
+        var window = new MaterialWindow(_project, _selected.Material) { Owner = this };
+        if (window.ShowDialog() != true) return;
+
+        _selected.Material = window.SelectedMaterialPath;
+        MaterialField.Text = _selected.Material ?? "";
+        LoadSceneIntoViews();
+        UpdateInspector();
+        SetDirty(true);
+        AddConsole($"Material aplicado em '{_selected.Name}'.", ScriptLogLevel.Info);
+    }
+
+    private void ClearMaterial_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selected is null || _isPlaying) return;
+        _selected.Material = null;
+        MaterialField.Text = "";
+        LoadSceneIntoViews();
+        UpdateInspector();
+        SetDirty(true);
+    }
+
     private void SpriteLoop_Click(object sender, RoutedEventArgs e) => ApplyInspector();
+
+    private void ParticleGravity_Click(object sender, RoutedEventArgs e) => ApplyInspector();
 
     private void OnTransformChanged(SceneObject item)
     {
@@ -800,9 +1053,14 @@ func InGame()
             PosXField.Text = FormatNumber(item.X);
             PosYField.Text = FormatNumber(item.Y);
             PosZField.Text = FormatNumber(item.Z);
+            RotXField.Text = FormatNumber(Value(item.Rotation, 0, 0));
+            RotYField.Text = FormatNumber(Value(item.Rotation, 1, 0));
+            RotZField.Text = FormatNumber(Value(item.Rotation, 2, 0));
+            ScaleXField.Text = FormatNumber(Value(item.Scale, 0, 1));
+            ScaleYField.Text = FormatNumber(Value(item.Scale, 1, 1));
+            ScaleZField.Text = FormatNumber(Value(item.Scale, 2, 1));
             _updatingInspector = false;
         }
-        HierarchyList.Items.Refresh();
         SetDirty(true);
     }
 
@@ -812,18 +1070,22 @@ func InGame()
     {
         AddComponentMenu.Children.Clear();
         AddMenuTitle(AddComponentMenu, "ADICIONAR COMPONENTE");
+        AddMenuButton(AddComponentMenu, "◆  CharacterBody", () => AddComponent("CharacterBody"));
         AddMenuButton(AddComponentMenu, "≡  Script VelvX", () => AddComponent("Script"));
         AddMenuButton(AddComponentMenu, "▤  Câmera", () => AddComponent("Camera"));
         AddMenuButton(AddComponentMenu, "◆  Mesh Renderer", () => AddComponent("MeshRenderer"));
         AddMenuButton(AddComponentMenu, "▣  Collider de caixa", () => AddComponent("BoxCollider"));
         AddMenuButton(AddComponentMenu, "●  Collider de esfera", () => AddComponent("SphereCollider"));
+        AddMenuButton(AddComponentMenu, "◇  Mesh Collider (forma do modelo)", () => AddComponent("MeshCollider"));
         AddMenuButton(AddComponentMenu, "⬇  Rigidbody", () => AddComponent("Rigidbody"));
+        AddMenuButton(AddComponentMenu, "◈  Corpo estático", () => AddComponent("StaticBody"));
         AddMenuButton(AddComponentMenu, "♪  Audio Source", () => AddComponent("AudioSource"));
         AddMenuSeparator(AddComponentMenu);
         AddMenuButton(AddComponentMenu, "↻  Rotador", () => AddComponent("Rotator"));
         AddMenuButton(AddComponentMenu, "▧  Animador de sprite", () => AddComponent("SpriteAnimator"));
         AddMenuButton(AddComponentMenu, "☼  Luz pontual", () => AddComponent("PointLight"));
         AddMenuButton(AddComponentMenu, "▣  Box Volume", () => AddComponent("BoxVolume"));
+        AddMenuButton(AddComponentMenu, "✦  Emissor de partículas", () => AddComponent("ParticleEmitter"));
     }
 
     private void AddComponent_Click(object sender, RoutedEventArgs e)
@@ -873,6 +1135,13 @@ func InGame()
             case "SphereCollider":
                 component.Shape = "Sphere";
                 break;
+            case "MeshCollider":
+                component.Shape = "Mesh";
+                UpdateModelColliderBounds(_selected);
+                break;
+            case "StaticBody":
+                component.Shape = "Box";
+                break;
             case "Rigidbody":
                 component.Mass = 1;
                 component.Gravity = 9.8;
@@ -881,6 +1150,23 @@ func InGame()
             case "AudioSource":
                 component.Volume = 1;
                 component.Loop = true;
+                break;
+            case "CharacterBody":
+                component.Speed = 6;
+                component.Amount = 8;
+                component.Mass = 1;
+                component.Shape = "Capsule";
+                if (string.IsNullOrWhiteSpace(_selected.Script))
+                    _selected.Script = _project?.Info.EntryScript;
+                break;
+            case "ParticleEmitter":
+                component.Amount = 40;
+                component.Lifetime = 1.6;
+                component.ParticleSize = 0.16;
+                component.Speed = 3;
+                component.Gravity = 2;
+                component.UseGravity = true;
+                component.Color = _selected.Color;
                 break;
             case "Script":
                 var picker = new OpenFileDialog
@@ -1007,6 +1293,44 @@ func InGame()
                 });
                 break;
 
+            case "CharacterBody":
+                AddInlineFields(stack,
+                    ("VELOCIDADE", FormatNumber(component.Speed), value => { component.Speed = Math.Max(0.1, ParseNumber(value, component.Speed)); ComponentChanged(component); }),
+                    ("SALTO", FormatNumber(component.Amount), value => { component.Amount = Math.Max(0, ParseNumber(value, component.Amount)); ComponentChanged(component); }));
+                AddInlineFields(stack,
+                    ("MASSA", FormatNumber(component.Mass), value => { component.Mass = Math.Max(0.01, ParseNumber(value, component.Mass)); ComponentChanged(component); }),
+                    ("COLLIDER", component.Shape, value => { component.Shape = string.IsNullOrWhiteSpace(value) ? "Capsule" : value.Trim(); ComponentChanged(component); }));
+                var bodyOwner = _selected;
+                AddPathField(stack, "SCRIPT DO JOGADOR", bodyOwner?.Script ?? "", value =>
+                {
+                    if (bodyOwner is null) return;
+                    bodyOwner.Script = string.IsNullOrWhiteSpace(value) ? null : value;
+                    ScriptPathText.Text = bodyOwner.Script ?? "Sem script vinculado";
+                    ComponentChanged(component);
+                }, () =>
+                {
+                    var bodyPath = _project?.ResolveAsset(bodyOwner?.Script) ?? bodyOwner?.Script;
+                    if (!string.IsNullOrWhiteSpace(bodyPath) && File.Exists(bodyPath)) OpenScriptFile(bodyPath);
+                });
+                break;
+
+            case "ParticleEmitter":
+                AddInlineFields(stack,
+                    ("QUANTIDADE", FormatNumber(component.Amount), value => { component.Amount = Math.Clamp(ParseNumber(value, component.Amount), 1, 600); ComponentChanged(component); }),
+                    ("VIDA (S)", FormatNumber(component.Lifetime), value => { component.Lifetime = Math.Max(0.1, ParseNumber(value, component.Lifetime)); ComponentChanged(component); }));
+                AddInlineFields(stack,
+                    ("VELOCIDADE", FormatNumber(component.Speed), value => { component.Speed = Math.Max(0, ParseNumber(value, component.Speed)); ComponentChanged(component); }),
+                    ("TAMANHO", FormatNumber(component.ParticleSize), value => { component.ParticleSize = Math.Max(0.01, ParseNumber(value, component.ParticleSize)); ComponentChanged(component); }));
+                AddInlineFields(stack,
+                    ("COR", component.Color, value => { if (IsValidColor(value)) component.Color = value; ComponentChanged(component); }),
+                    ("GRAVIDADE", FormatNumber(component.Gravity), value => { component.Gravity = Math.Max(0, ParseNumber(value, component.Gravity)); ComponentChanged(component); }));
+                AddInlineCheck(stack, "Usar gravidade", component.UseGravity, value =>
+                {
+                    component.UseGravity = value;
+                    ComponentChanged(component);
+                });
+                break;
+
             case "Rotator":
                 AddInlineFields(stack,
                     ("EIXO", component.Axis, value => { component.Axis = value.ToUpperInvariant(); ComponentChanged(component); }),
@@ -1075,6 +1399,37 @@ func InGame()
                     component.Trigger = value;
                     ComponentChanged(component);
                 });
+                break;
+
+            case "MeshCollider":
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "A Engine lê a caixa do modelo importado automaticamente. Não é preciso desenhar a colisão nem editar a camada.",
+                    FontSize = 9.5,
+                    Foreground = new SolidColorBrush(Color.FromRgb(140, 145, 163)),
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 2, 0, 6)
+                });
+                AddInlineFields(stack,
+                    ("CAMADAS (MÁSCARA)", component.LayerMask, value => { component.LayerMask = string.IsNullOrWhiteSpace(value) ? "*" : value.Trim(); ComponentChanged(component); }));
+                AddInlineCheck(stack, "É um gatilho (OnTriggerEnter / Stay / Exit)", component.Trigger, value =>
+                {
+                    component.Trigger = value;
+                    ComponentChanged(component);
+                });
+                break;
+
+            case "StaticBody":
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Corpo sólido que não se move. CharacterBody colide com ele usando as camadas do projeto.",
+                    FontSize = 9.5,
+                    Foreground = new SolidColorBrush(Color.FromRgb(140, 145, 163)),
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 2, 0, 4)
+                });
+                AddInlineFields(stack,
+                    ("CAMADAS (MÁSCARA)", component.LayerMask, value => { component.LayerMask = string.IsNullOrWhiteSpace(value) ? "*" : value.Trim(); ComponentChanged(component); }));
                 break;
 
             case "Rigidbody":
@@ -1262,7 +1617,8 @@ func InGame()
     {
         SetDirty(true);
         if (component.Type is "PointLight" or "BoxVolume" or "MeshRenderer" or "Camera" or
-            "BoxCollider" or "SphereCollider" or "Rigidbody" or "AudioSource")
+            "BoxCollider" or "SphereCollider" or "Rigidbody" or "AudioSource" or
+            "CharacterBody" or "ParticleEmitter")
             LoadSceneIntoViews();
     }
 
@@ -1315,14 +1671,13 @@ func InGame()
                 AddMenuButton(MenuPopupPanel, "Editor de script", OpenLargeScriptWindow);
                 AddMenuButton(MenuPopupPanel, "Recursos", RefreshResources);
                 AddMenuButton(MenuPopupPanel, "Saída", () => ConsoleList.Focus());
-                AddMenuButton(MenuPopupPanel, _helpVisible ? "Ocultar ajuda do script" : "Mostrar ajuda do script", ToggleHelp);
                 AddMenuSeparator(MenuPopupPanel);
                 AddMenuButton(MenuPopupPanel, "Resetar câmera", () => ResetCamera_Click(this, new RoutedEventArgs()));
                 break;
 
             case "help":
                 AddMenuTitle(MenuPopupPanel, "AJUDA");
-                AddMenuButton(MenuPopupPanel, "Referência da VelvX Language", ToggleHelp);
+                AddMenuButton(MenuPopupPanel, "Referência da VelvX Language", OpenDocs);
                 AddMenuButton(MenuPopupPanel, "Atalhos do editor", ShowShortcuts);
                 AddMenuButton(MenuPopupPanel, $"Sobre o VelvX {EnginePaths.Version}", ShowAbout);
                 break;
@@ -1407,12 +1762,18 @@ func InGame()
         }
     }
 
-    private void ToggleHelp_Click(object sender, RoutedEventArgs e) => ToggleHelp();
+    private void OpenDocs_Click(object sender, RoutedEventArgs e) => OpenDocs();
 
-    private void ToggleHelp()
+    private void OpenDocs()
     {
-        _helpVisible = !_helpVisible;
-        ScriptHelpPanel.Visibility = _helpVisible ? Visibility.Visible : Visibility.Collapsed;
+        try
+        {
+            new LanguageDocsWindow { Owner = this }.ShowDialog();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "Documentação", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void ShowShortcuts()
@@ -1456,6 +1817,7 @@ func InGame()
         ScriptEditor.Text = text;
         _loading = false;
         ScriptFileText.Text = Path.GetFileName(_scriptPath);
+        ScriptTabLabel.Text = Path.GetFileName(_scriptPath);
     }
 
     private void OnScriptChanged()
@@ -1477,36 +1839,13 @@ func InGame()
 
     private void OpenLargeScriptWindow()
     {
-        if (_project is null) return;
         if (_isPlaying)
         {
             AddConsole("Pare a execução antes de editar o script.", ScriptLogLevel.Warning);
             return;
         }
-
-        var window = new ScriptEditorWindow(_project, _scriptPath, ScriptEditor.Text) { Owner = this };
-        window.ShowDialog();
-
-        var path = window.ActivePath;
-        var text = window.ActiveText;
-        var onDisk = File.Exists(path) ? File.ReadAllText(path) : text;
-
-        _scriptPath = path;
-        _loading = true;
-        try
-        {
-            ScriptEditor.Text = text;
-            ScriptEditor.CaretOffset = 0;
-        }
-        finally
-        {
-            _loading = false;
-        }
-
-        ScriptFileText.Text = Path.GetFileName(_scriptPath);
-        SetScriptDirty(text != onDisk);
+        ShowWorkspace("script");
         ScriptEditor.Focus();
-        AddConsole($"Script '{Path.GetFileName(_scriptPath)}' sincronizado com o editor grande.", ScriptLogLevel.Info);
     }
 
     private void OpenScriptDialog()
@@ -1537,7 +1876,9 @@ func InGame()
         LoadScriptText(File.ReadAllText(_scriptPath));
         SetScriptDirty(false);
         ScriptEditor.ScrollToHome();
+        ShowWorkspace("script");
         ScriptEditor.Focus();
+        UpdateWorkspaceInfo();
         AddConsole($"Script '{Path.GetFileName(_scriptPath)}' aberto.", ScriptLogLevel.Info);
     }
 
@@ -1550,7 +1891,8 @@ func InGame()
         if (string.IsNullOrWhiteSpace(path)) return;
         var full = _project?.ResolveAsset(path) ?? path;
         if (File.Exists(full)) OpenScriptFile(full);
-        else ScriptEditor.Focus();
+        ShowWorkspace("script");
+        ScriptEditor.Focus();
     }
 
     private void ImportScript()
@@ -1832,7 +2174,9 @@ func InGame()
         if (elapsed >= 0.5)
         {
             _fps = _fpsFrames / elapsed;
-            FpsText.Text = _project?.Info.Render.ShowFps == true ? $"{_fps:0} FPS" : "";
+            var showFps = _project?.Info.Render.ShowFps == true;
+            FpsText.Text = showFps ? $"{_fps:0} FPS" : "";
+            PlayFpsText.Text = showFps ? $"{_fps:0} FPS" : "";
             _fpsFrames = 0;
             _fpsWindowStart = DateTime.Now;
         }
@@ -1923,19 +2267,29 @@ func InGame()
         PlayButton.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
         StopButton.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
         PlayOverlay.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
+        EditorViewportChrome.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
+        PlayHud.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
+        PlayIdlePanel.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
         AddObjectButton.IsEnabled = !playing;
         DeleteHierarchyButton.IsEnabled = !playing;
         DuplicateHierarchyButton.IsEnabled = !playing;
+        NewFolderButton.IsEnabled = !playing;
+        NewScriptButton.IsEnabled = !playing;
+        ResourceNewButton.IsEnabled = !playing;
         HierarchyList.IsEnabled = !playing;
         InspectorFields.IsEnabled = !playing;
         ScriptEditor.IsReadOnly = playing;
         View3D.SetPlayMode(playing);
         View2D.SetPlayMode(playing);
+        AttachViewport(playing);
+        ShowWorkspace(playing ? "play" : "scene");
         StatusDot.Fill = playing ? SuccessBrush : IdleDotBrush;
         StatusText.Text = playing ? "EXECUTANDO" : "PRONTO";
         ModeBadgeBorder.Background = playing
             ? new SolidColorBrush(Color.FromRgb(30, 58, 47))
             : new SolidColorBrush(Color.FromRgb(40, 33, 63));
+
+        if (!playing) PlayFpsText.Text = "";
 
         if (playing)
         {
@@ -1946,6 +2300,68 @@ func InGame()
         {
             Keyboard.ClearFocus();
         }
+    }
+
+    private void AttachViewport(bool playing)
+    {
+        if (ViewportHost.Parent is Panel current)
+            current.Children.Remove(ViewportHost);
+
+        ViewportHost.HorizontalAlignment = HorizontalAlignment.Stretch;
+        ViewportHost.VerticalAlignment = VerticalAlignment.Stretch;
+        ViewportHost.Margin = new Thickness(0);
+
+        var host = playing ? (Panel)PlayHost : SceneHost;
+        host.Children.Add(ViewportHost);
+    }
+
+    private void WorkspaceTab_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string page }) return;
+        if (_isPlaying && page != "play")
+        {
+            AddConsole("Pare a execução para voltar ao editor.", ScriptLogLevel.Warning);
+            return;
+        }
+        ShowWorkspace(page);
+    }
+
+    private void RestartPlay_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isPlaying) StopPlay(false);
+        StartPlay();
+    }
+
+    private void ShowWorkspace(string page)
+    {
+        _workspace = page;
+        SceneWorkspace.Visibility = page == "scene" ? Visibility.Visible : Visibility.Collapsed;
+        ScriptWorkspace.Visibility = page == "script" ? Visibility.Visible : Visibility.Collapsed;
+        PlayWorkspace.Visibility = page == "play" ? Visibility.Visible : Visibility.Collapsed;
+
+        PlayIdlePanel.Visibility = page == "play" && !_isPlaying ? Visibility.Visible : Visibility.Collapsed;
+        PlayHud.Visibility = page == "play" && _isPlaying ? Visibility.Visible : Visibility.Collapsed;
+
+        WorkspaceTabScene.Style = (Style)FindResource(page == "scene" ? "WorkspaceTabActive" : "WorkspaceTab");
+        WorkspaceTabScript.Style = (Style)FindResource(page == "script" ? "WorkspaceTabActive" : "WorkspaceTab");
+        WorkspaceTabPlay.Style = (Style)FindResource(page == "play" ? "WorkspaceTabActive" : "WorkspaceTab");
+
+        if (page == "script")
+            Dispatcher.BeginInvoke(() => ScriptEditor.Focus(), DispatcherPriority.Input);
+
+        UpdateWorkspaceInfo();
+    }
+
+    private void UpdateWorkspaceInfo()
+    {
+        var scriptName = string.IsNullOrWhiteSpace(_scriptPath) ? "" : Path.GetFileName(_scriptPath);
+        ScriptTabLabel.Text = scriptName;
+        WorkspaceInfoText.Text = _workspace switch
+        {
+            "script" => string.IsNullOrWhiteSpace(scriptName) ? "Nenhum script aberto" : scriptName,
+            "play" => _isPlaying ? "Execução em andamento" : "Pronto para executar",
+            _ => _scene is null ? "" : $"{_scene.Name} · {_scene.Objects.Count} atores"
+        };
     }
 
     private void Play_Click(object sender, RoutedEventArgs e) => StartPlay();
@@ -1965,19 +2381,29 @@ func InGame()
     private void BuildAddObjectMenu()
     {
         AddObjectMenu.Children.Clear();
-        AddMenuTitle(AddObjectMenu, "ADICIONAR OBJETO");
+        AddMenuTitle(AddObjectMenu, "ADICIONAR ATOR");
 
         var is3D = _project?.Is3D ?? true;
-        AddMenuButton(AddObjectMenu, "○  Objeto vazio (GameObject)", () => CreateObject("GameObject"));
+        AddMenuButton(AddObjectMenu, "○  Ator vazio (GameObject)", () => CreateObject("GameObject"));
         AddMenuSeparator(AddObjectMenu);
         if (is3D)
         {
-            AddMenuButton(AddObjectMenu, "▣  Caixa", () => CreateObject("Box"));
+            AddMenuTitle(AddObjectMenu, "PRIMITIVAS 3D");
+            AddMenuButton(AddObjectMenu, "▣  Caixa / Cubo", () => CreateObject("Box"));
             AddMenuButton(AddObjectMenu, "●  Esfera", () => CreateObject("Sphere"));
-            AddMenuButton(AddObjectMenu, "◆  Player 3D", () => CreateObject("CharacterBody3D"));
+            AddMenuButton(AddObjectMenu, "◙  Cilindro", () => CreateObject("Cylinder"));
+            AddMenuButton(AddObjectMenu, "◍  Cápsula", () => CreateObject("Capsule"));
+            AddMenuButton(AddObjectMenu, "▲  Cone", () => CreateObject("Cone"));
+            AddMenuButton(AddObjectMenu, "▬  Plano", () => CreateObject("Plane"));
+            AddMenuSeparator(AddObjectMenu);
+            AddMenuTitle(AddObjectMenu, "CORPOS E COLISÃO");
+            AddMenuButton(AddObjectMenu, "◆  Corpo de personagem", () => CreateObject("CharacterBody3D"));
+            AddMenuButton(AddObjectMenu, "◈  Corpo estático", () => CreateObject("StaticBody3D"));
+            AddMenuSeparator(AddObjectMenu);
             AddMenuButton(AddObjectMenu, "◇  Modelo 3D…", () => ImportModelFlow());
             AddMenuButton(AddObjectMenu, "☼  Luz pontual", () => CreateObject("PointLight"));
             AddMenuButton(AddObjectMenu, "☀  Luz direcional", () => CreateObject("DirectionalLight"));
+            AddMenuButton(AddObjectMenu, "✦  Emissor de partículas", CreateParticleObject);
             AddMenuSeparator(AddObjectMenu);
             AddMenuButton(AddObjectMenu, "◎  Global Volume", () => CreateObject("GlobalVolume"));
             AddMenuButton(AddObjectMenu, "▣  Box Volume", () => CreateObject("BoxVolume"));
@@ -1988,11 +2414,36 @@ func InGame()
             AddMenuButton(AddObjectMenu, "▭  Retângulo", () => CreateObject("Rectangle"));
             AddMenuButton(AddObjectMenu, "◯  Círculo", () => CreateObject("Ellipse"));
             AddMenuButton(AddObjectMenu, "▧  Sprite / GIF…", () => ImportSpriteFlow());
-            AddMenuButton(AddObjectMenu, "◆  Player 2D", () => CreateObject("CharacterBody2D"));
+            AddMenuButton(AddObjectMenu, "✦  Emissor de partículas", CreateParticleObject);
             AddMenuSeparator(AddObjectMenu);
             AddMenuButton(AddObjectMenu, "▣  Box Volume", () => CreateObject("BoxVolume"));
             AddMenuButton(AddObjectMenu, "▤  Câmera 2D", () => CreateObject("Camera2D"));
         }
+    }
+
+    private void CreateParticleObject()
+    {
+        AddObjectPopup.IsOpen = false;
+        if (_scene is null || _isPlaying) return;
+
+        var item = _scene.CreateObject("GameObject");
+        item.Name = _scene.NewName("GameObject", "Partículas");
+        item.Components.Add(new ComponentData
+        {
+            Type = "ParticleEmitter",
+            Amount = 40,
+            Lifetime = 1.6,
+            ParticleSize = 0.16,
+            Speed = 3,
+            Color = "#A98BFF",
+            Gravity = 2,
+            UseGravity = true
+        });
+        LoadSceneIntoViews();
+        RefreshHierarchy(item.Id);
+        SelectObject(item);
+        SetDirty(true);
+        AddConsole($"{item.Name} adicionado à cena.", ScriptLogLevel.Info);
     }
 
     private void CreateObject(string type)
@@ -2391,11 +2842,10 @@ func InGame()
         AddMenuTitle(ResourceNewMenu, "CRIAR RECURSO");
         AddMenuButton(ResourceNewMenu, "◈  Prefab: Caixa", () => CreateEmptyPrefab("Box"));
         AddMenuButton(ResourceNewMenu, "◈  Prefab: Esfera", () => CreateEmptyPrefab("Sphere"));
-        AddMenuButton(ResourceNewMenu, _project?.Is3D == false ? "◈  Prefab: Player 2D" : "◈  Prefab: Player 3D",
-            () => CreateEmptyPrefab(_project?.Is3D == false ? "CharacterBody2D" : "CharacterBody3D"));
         AddMenuButton(ResourceNewMenu, "◈  Prefab: Luz pontual", () => CreateEmptyPrefab("PointLight"));
         AddMenuButton(ResourceNewMenu, "◈  Prefab: Box Volume", () => CreateEmptyPrefab("BoxVolume"));
         AddMenuSeparator(ResourceNewMenu);
+        AddMenuButton(ResourceNewMenu, "≡  Novo script…", () => NewScript_Click(this, new RoutedEventArgs()));
         AddMenuButton(ResourceNewMenu, "▣  Nova pasta…", CreateResourceFolder);
         AddMenuButton(ResourceNewMenu, "◇  Nova cena…", () => NewScene_Click(this, new RoutedEventArgs()));
     }
@@ -2431,10 +2881,95 @@ func InGame()
         AddConsole($"Prefab '{name.Trim()}' criado.", ScriptLogLevel.Info);
     }
 
+    private void NewFolder_Click(object sender, RoutedEventArgs e)
+    {
+        ResourceNewPopup.IsOpen = false;
+        CreateResourceFolder();
+    }
+
+    private void NewScript_Click(object sender, RoutedEventArgs e)
+    {
+        ResourceNewPopup.IsOpen = false;
+        if (_project is null || _isPlaying) return;
+
+        var folder = GetSelectedResourceFolder() ?? _project.Resolve("Scripts", "Scripts");
+        var name = InputPrompt.Ask(this, "Novo script", "Nome do script (ex.: PlayerController)", "NovoScript");
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        try
+        {
+            Directory.CreateDirectory(folder);
+            var safe = SceneFactory.SafeFileName(name);
+            if (!safe.EndsWith(".velv", StringComparison.OrdinalIgnoreCase)) safe += ".velv";
+            var path = UniqueFile(folder, safe);
+            File.WriteAllText(path, DefaultScript);
+            BuildResourceTree();
+            OpenScriptFile(path);
+            ShowWorkspace("script");
+            AddConsole($"Script '{Path.GetFileName(path)}' criado em {_project.ToRelativePath(path)}.", ScriptLogLevel.Info);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "Novo script", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void ResourceRename_Click(object sender, RoutedEventArgs e)
+    {
+        if (_project is null || ResourceTree.SelectedItem is not TreeViewItem { Tag: string path }) return;
+        if (string.Equals(Path.GetFullPath(path), Path.GetFullPath(_project.FolderPath), StringComparison.OrdinalIgnoreCase))
+        {
+            AddConsole("A pasta raiz do projeto não pode ser renomeada por aqui.", ScriptLogLevel.Warning);
+            return;
+        }
+
+        var isDirectory = Directory.Exists(path);
+        if (!isDirectory && !File.Exists(path)) return;
+
+        var current = Path.GetFileName(path);
+        var name = InputPrompt.Ask(this, "Renomear recurso", "Novo nome", current);
+        if (string.IsNullOrWhiteSpace(name) || string.Equals(name.Trim(), current, StringComparison.Ordinal)) return;
+
+        var folder = Path.GetDirectoryName(path);
+        if (string.IsNullOrWhiteSpace(folder)) return;
+        var target = Path.Combine(folder, name.Trim());
+
+        try
+        {
+            if (File.Exists(target) || Directory.Exists(target))
+            {
+                AddConsole($"Já existe um recurso chamado '{name.Trim()}'.", ScriptLogLevel.Warning);
+                return;
+            }
+            if (isDirectory) Directory.Move(path, target);
+            else File.Move(path, target);
+            BuildResourceTree();
+            AddConsole($"Recurso renomeado para '{name.Trim()}'.", ScriptLogLevel.Info);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "Renomear recurso", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void ResourceReveal_Click(object sender, RoutedEventArgs e)
+    {
+        if (ResourceTree.SelectedItem is not TreeViewItem { Tag: string path }) return;
+        try
+        {
+            var arguments = Directory.Exists(path) ? $"\"{path}\"" : $"/select,\"{path}\"";
+            Process.Start(new ProcessStartInfo("explorer.exe", arguments) { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "Abrir pasta", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void CreateResourceFolder()
     {
         ResourceNewPopup.IsOpen = false;
-        if (_project is null) return;
+        if (_project is null || _isPlaying) return;
 
         var baseFolder = GetSelectedResourceFolder() ?? _project.FolderPath;
         var name = InputPrompt.Ask(this, "Nova pasta", "Nome da pasta");
@@ -2442,8 +2977,10 @@ func InGame()
 
         try
         {
-            Directory.CreateDirectory(Path.Combine(baseFolder, SceneFactory.SafeFileName(name)));
+            var target = Path.Combine(baseFolder, SceneFactory.SafeFileName(name));
+            Directory.CreateDirectory(target);
             BuildResourceTree();
+            AddConsole($"Pasta '{Path.GetFileName(target)}' criada.", ScriptLogLevel.Info);
         }
         catch (Exception exception)
         {
@@ -2470,16 +3007,17 @@ func InGame()
         var current = e.GetPosition(ResourceTree);
         if (Math.Abs(current.X - _dragStartPoint.X) < 6 && Math.Abs(current.Y - _dragStartPoint.Y) < 6) return;
 
-        if (_dragResource.Tag is string path && File.Exists(path))
+        if (_dragResource.Tag is string path && (File.Exists(path) || Directory.Exists(path)))
         {
             var data = new DataObject(DataFormats.FileDrop, new[] { path });
-            DragDrop.DoDragDrop(ResourceTree, data, DragDropEffects.Copy);
+            DragDrop.DoDragDrop(ResourceTree, data, DragDropEffects.Move | DragDropEffects.Copy);
         }
         _dragResource = null;
     }
 
     private void ResourceTree_Drop(object sender, DragEventArgs e)
     {
+        if (_isPlaying) return;
         var directory = GetDropDirectory(e.GetPosition(ResourceTree));
         if (directory is null) return;
 
@@ -2495,23 +3033,85 @@ func InGame()
         {
             foreach (var file in files)
             {
-                if (file.EndsWith(".prefab.json", StringComparison.OrdinalIgnoreCase) &&
-                    !IsInside(file, directory))
+                try
                 {
-                    try
-                    {
-                        var target = UniqueFile(directory, Path.GetFileName(file));
-                        File.Copy(file, target);
-                    }
-                    catch
-                    {
-                        // Ignora falhas de cópia individual.
-                    }
+                    MoveOrCopyResource(file, directory);
+                }
+                catch (Exception exception)
+                {
+                    AddConsole($"Não foi possível mover '{Path.GetFileName(file)}': {exception.Message}", ScriptLogLevel.Warning);
                 }
             }
             BuildResourceTree();
             e.Handled = true;
         }
+    }
+
+    private void MoveOrCopyResource(string source, string targetFolder)
+    {
+        if (_project is null) return;
+        if (!File.Exists(source) && !Directory.Exists(source)) return;
+
+        var sourceFull = Path.GetFullPath(source);
+        var targetFull = Path.GetFullPath(targetFolder);
+        var sourceParent = Path.GetDirectoryName(sourceFull) ?? "";
+        if (string.Equals(sourceParent, targetFull, StringComparison.OrdinalIgnoreCase)) return;
+
+        var isDirectory = Directory.Exists(sourceFull);
+        if (isDirectory &&
+            (string.Equals(sourceFull, targetFull, StringComparison.OrdinalIgnoreCase) ||
+             IsInside(targetFull, sourceFull))) return;
+
+        var insideProject = IsInside(sourceFull, _project.FolderPath);
+        if (insideProject)
+        {
+            var target = isDirectory
+                ? UniqueDirectory(targetFull, Path.GetFileName(sourceFull))
+                : UniqueFile(targetFull, Path.GetFileName(sourceFull));
+
+            if (isDirectory) Directory.Move(sourceFull, target);
+            else
+            {
+                if (string.Equals(Path.GetFullPath(target), sourceFull, StringComparison.OrdinalIgnoreCase)) return;
+                File.Move(sourceFull, target);
+            }
+
+            if (string.Equals(sourceFull, Path.GetFullPath(_scenePath), StringComparison.OrdinalIgnoreCase))
+                _scenePath = target;
+            if (string.Equals(sourceFull, Path.GetFullPath(_scriptPath), StringComparison.OrdinalIgnoreCase))
+            {
+                _scriptPath = target;
+                UpdateWorkspaceInfo();
+            }
+            AddConsole($"'{Path.GetFileName(sourceFull)}' movido para {Path.GetFileName(targetFull)}.", ScriptLogLevel.Info);
+            return;
+        }
+
+        var destination = isDirectory
+            ? UniqueDirectory(targetFull, Path.GetFileName(sourceFull))
+            : UniqueFile(targetFull, Path.GetFileName(sourceFull));
+        if (isDirectory) CopyDirectory(sourceFull, destination);
+        else File.Copy(sourceFull, destination);
+        AddConsole($"'{Path.GetFileName(sourceFull)}' importado para {Path.GetFileName(targetFull)}.", ScriptLogLevel.Info);
+    }
+
+    private static string UniqueDirectory(string parent, string name)
+    {
+        Directory.CreateDirectory(parent);
+        var path = Path.Combine(parent, name);
+        var suffix = 2;
+        while (Directory.Exists(path))
+            path = Path.Combine(parent, $"{name}_{suffix++}");
+        return path;
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (var file in Directory.GetFiles(source))
+            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), overwrite: false);
+        foreach (var directory in Directory.GetDirectories(source))
+            CopyDirectory(directory, Path.Combine(target, Path.GetFileName(directory)));
     }
 
     private void CreatePrefabFromObject(SceneObject item, string directory)
@@ -2540,7 +3140,7 @@ func InGame()
     private void HierarchyList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _dragStartPoint = e.GetPosition(HierarchyList);
-        _dragObject = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject)?.DataContext as SceneObject;
+        _dragObject = (FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.DataContext as HierarchyNode)?.Object;
     }
 
     private void HierarchyList_PreviewMouseMove(object sender, MouseEventArgs e)
@@ -2550,7 +3150,7 @@ func InGame()
         if (Math.Abs(current.X - _dragStartPoint.X) < 6 && Math.Abs(current.Y - _dragStartPoint.Y) < 6) return;
 
         var data = new DataObject(SceneObjectFormat, _dragObject);
-        DragDrop.DoDragDrop(HierarchyList, data, DragDropEffects.Copy);
+        DragDrop.DoDragDrop(HierarchyList, data, DragDropEffects.Move | DragDropEffects.Copy);
         _dragObject = null;
     }
 
@@ -2584,6 +3184,35 @@ func InGame()
     private void HierarchyList_Drop(object sender, DragEventArgs e)
     {
         if (_isPlaying) return;
+
+        if (e.Data.GetDataPresent(SceneObjectFormat) &&
+            e.Data.GetData(SceneObjectFormat) is SceneObject dragged && _scene is not null)
+        {
+            var target = (FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.DataContext as HierarchyNode)?.Object;
+            if (target is not null && ReferenceEquals(target, dragged))
+            {
+                e.Handled = true;
+                return;
+            }
+            if (target is not null && IsDescendantOf(target, dragged))
+            {
+                AddConsole("Um objeto não pode ser filho de um descendente seu.", ScriptLogLevel.Warning);
+                e.Handled = true;
+                return;
+            }
+
+            dragged.ParentId = target?.Id;
+            if (target is not null) _expandedHierarchy.Add(target.Id);
+            SetDirty(true);
+            RefreshHierarchy(dragged.Id);
+            UpdateInspector();
+            AddConsole(target is null
+                ? $"'{dragged.Name}' voltou para a raiz da cena."
+                : $"'{dragged.Name}' agora é filho de '{target.Name}'.", ScriptLogLevel.Info);
+            e.Handled = true;
+            return;
+        }
+
         if (e.Data.GetDataPresent(DataFormats.FileDrop) &&
             e.Data.GetData(DataFormats.FileDrop) is string[] files)
         {
@@ -2632,6 +3261,51 @@ func InGame()
         AddModelObject(picker.FileName);
     }
 
+    /// <summary>
+    /// Lê a caixa real do modelo importado e guarda na cena. O MeshCollider e a
+    /// física usam esses limites sem exigir que o criador desenhe a colisão.
+    /// </summary>
+    private void UpdateModelColliderBounds(SceneObject item)
+    {
+        if (_project is null) return;
+
+        var path = item.Model;
+        if (string.IsNullOrWhiteSpace(path))
+            path = item.GetComponent("MeshRenderer")?.Asset;
+        if (string.IsNullOrWhiteSpace(path) || !IsModelFilePath(path))
+        {
+            item.ColliderBounds = null;
+            return;
+        }
+
+        try
+        {
+            var fullPath = _project.ResolveAsset(path);
+            if (!File.Exists(fullPath)) return;
+            var bounds = ModelAsset.Load(fullPath).Bounds;
+            if (bounds.IsEmpty || bounds.SizeX <= 0 || bounds.SizeY <= 0 || bounds.SizeZ <= 0) return;
+            item.ColliderBounds =
+            [
+                bounds.X, bounds.Y, bounds.Z,
+                bounds.X + bounds.SizeX, bounds.Y + bounds.SizeY, bounds.Z + bounds.SizeZ
+            ];
+        }
+        catch
+        {
+            // Um modelo inválido não deve impedir a importação nem a edição.
+        }
+    }
+
+    private static bool IsModelFilePath(string path) =>
+        path.EndsWith(".obj", StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".gltf", StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".glb", StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".dae", StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".3ds", StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".ply", StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".stl", StringComparison.OrdinalIgnoreCase);
+
     private void AddModelObject(string source)
     {
         if (_project is null || _scene is null || _isPlaying) return;
@@ -2642,6 +3316,25 @@ func InGame()
         item.Name = _scene.NewName("Model3D", name);
         item.Model = relative;
         item.Color = "#8E86A8";
+        UpdateModelColliderBounds(item);
+
+        try
+        {
+            var modelFolder = Path.GetDirectoryName(_project.ResolveAsset(relative));
+            if (!string.IsNullOrWhiteSpace(modelFolder) && Directory.Exists(modelFolder))
+            {
+                var hasMaterial = Directory.EnumerateFiles(modelFolder, "*.mtl", SearchOption.AllDirectories).Any();
+                var texture = Directory.EnumerateFiles(modelFolder, "*", SearchOption.AllDirectories)
+                    .FirstOrDefault(file => IsSpriteFile(file) &&
+                        string.Equals(Path.GetFileNameWithoutExtension(file), name, StringComparison.OrdinalIgnoreCase));
+                // Se o modelo já traz .mtl com textura, deixa o Assimp aplicar o material original.
+                if (!hasMaterial && texture is not null) item.ModelTexture = _project.ToRelativePath(texture);
+            }
+        }
+        catch
+        {
+            // Textura automática é opcional.
+        }
 
         LoadSceneIntoViews();
         RefreshHierarchy(item.Id);
@@ -2716,7 +3409,72 @@ func InGame()
         Directory.CreateDirectory(folder);
         var target = UniqueFile(folder, Path.GetFileName(source));
         File.Copy(source, target, overwrite: false);
+
+        if (string.Equals(kind, "Models", StringComparison.OrdinalIgnoreCase))
+            CopyModelCompanions(source, folder);
+
         return _project.ToRelativePath(target);
+    }
+
+    private static void CopyModelCompanions(string source, string targetFolder)
+    {
+        var sourceFolder = Path.GetDirectoryName(Path.GetFullPath(source));
+        if (string.IsNullOrWhiteSpace(sourceFolder) || !Directory.Exists(sourceFolder)) return;
+
+        var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var material in Directory.EnumerateFiles(sourceFolder, "*.mtl", SearchOption.AllDirectories))
+        {
+            referenced.Add(material);
+            var materialFolder = Path.GetDirectoryName(material) ?? sourceFolder;
+            try
+            {
+                foreach (var line in File.ReadLines(material))
+                {
+                    var trimmed = line.Trim();
+                    if (!(trimmed.StartsWith("map_", StringComparison.OrdinalIgnoreCase) ||
+                          trimmed.StartsWith("bump", StringComparison.OrdinalIgnoreCase) ||
+                          trimmed.StartsWith("disp", StringComparison.OrdinalIgnoreCase) ||
+                          trimmed.StartsWith("refl", StringComparison.OrdinalIgnoreCase)))
+                        continue;
+                    var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 2) continue;
+                    var candidate = Path.Combine(materialFolder,
+                        parts[^1].Trim('"').Replace('/', Path.DirectorySeparatorChar));
+                    if (File.Exists(candidate)) referenced.Add(candidate);
+                }
+            }
+            catch
+            {
+                // Material ilegível; segue com o modelo.
+            }
+        }
+
+        var baseName = Path.GetFileNameWithoutExtension(source);
+        foreach (var image in Directory.EnumerateFiles(sourceFolder, "*", SearchOption.AllDirectories).Where(IsSpriteFile))
+        {
+            if (string.Equals(Path.GetFileNameWithoutExtension(image), baseName, StringComparison.OrdinalIgnoreCase))
+                referenced.Add(image);
+        }
+
+        foreach (var file in referenced)
+        {
+            var relative = Path.GetRelativePath(sourceFolder, file);
+            if (relative.StartsWith("..", StringComparison.Ordinal))
+                relative = Path.GetFileName(file);
+
+            var target = Path.Combine(targetFolder, relative);
+            var targetDirectory = Path.GetDirectoryName(target);
+            if (!string.IsNullOrWhiteSpace(targetDirectory)) Directory.CreateDirectory(targetDirectory);
+            if (File.Exists(target)) continue;
+            try
+            {
+                File.Copy(file, target, overwrite: false);
+            }
+            catch
+            {
+                // Arquivo companheiro indisponível.
+            }
+        }
     }
 
     private static string UniqueFile(string folder, string fileName)
@@ -2794,6 +3552,23 @@ func InGame()
             FocusSelected_Click(this, new RoutedEventArgs());
             e.Handled = true;
             return;
+        }
+        if (!control && !IsTextInputFocused() && _workspace == "scene")
+        {
+            var mode = e.Key switch
+            {
+                Key.D1 or Key.NumPad1 => GizmoMode.Translate,
+                Key.D2 or Key.NumPad2 => GizmoMode.Rotate,
+                Key.D3 or Key.NumPad3 => GizmoMode.Scale,
+                _ => (GizmoMode?)null
+            };
+            if (mode is not null)
+            {
+                View3D.SetGizmoMode(mode.Value);
+                UpdateGizmoToolbar();
+                e.Handled = true;
+                return;
+            }
         }
         if (e.Key == Key.Delete && !IsTextInputFocused())
         {
@@ -2899,6 +3674,44 @@ func InGame()
         }
         return null;
     }
+}
+
+/// <summary>Nó da hierarquia: agrupa um objeto da cena e seus filhos.</summary>
+public sealed class HierarchyNode : INotifyPropertyChanged
+{
+    private bool _isExpanded;
+    private bool _isSelected;
+
+    public HierarchyNode(SceneObject item) => Object = item;
+
+    public SceneObject Object { get; }
+    public List<HierarchyNode> Children { get; } = [];
+
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded == value) return;
+            _isExpanded = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
+        }
+    }
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value) return;
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        }
+    }
+
+    public string StateMark => Object.Visible ? "" : "○";
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 }
 
 public sealed class ConsoleEntry

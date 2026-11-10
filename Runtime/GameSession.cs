@@ -1,4 +1,5 @@
 using System.IO;
+using System.Numerics;
 using VelvX.Engine.Core;
 using VelvX.Engine.Language;
 
@@ -48,7 +49,8 @@ public sealed class GameSession : IScriptHost
                                 !string.IsNullOrWhiteSpace(item.Script) &&
                                 string.Equals(item.Script, project?.Info.EntryScript, StringComparison.OrdinalIgnoreCase))
                             ?? scene.Objects.FirstOrDefault(item =>
-                                item.Type is "CharacterBody3D" or "CharacterBody2D")
+                                item.Type is "CharacterBody3D" or "CharacterBody2D" ||
+                                item.HasComponent("CharacterBody"))
                             ?? scene.Objects.FirstOrDefault();
 
         if (_playerSceneObject is not null)
@@ -57,6 +59,8 @@ public sealed class GameSession : IScriptHost
             var componentName = scene.Is3D ? "CharacterBody3D" : "CharacterBody2D";
             if (_this.TryGet(componentName, out var component) && component is ScriptObject componentObject)
                 _playerComponent = componentObject;
+            else if (_this.TryGet("CharacterBody", out var generic) && generic is ScriptObject genericObject)
+                _playerComponent = genericObject;
         }
         else
         {
@@ -128,6 +132,7 @@ public sealed class GameSession : IScriptHost
         ApplyTransforms(before);
         ApplyNativeComponents();
         ApplyPhysics();
+        ResolveBodyCollisions();
         UpdateTriggers();
         UpdateSceneManager();
     }
@@ -532,13 +537,20 @@ public sealed class GameSession : IScriptHost
             item.Scale.Length > 1 ? item.Scale[1] : 1,
             item.Scale.Length > 2 ? item.Scale[2] : 1));
 
-        if (item.Type is "CharacterBody3D" or "CharacterBody2D")
+        var isCharacter = item.Type is "CharacterBody3D" or "CharacterBody2D" ||
+                          item.HasComponent("CharacterBody");
+        if (isCharacter)
         {
-            var component = new ScriptObject(item.Type, "Component");
+            var component = new ScriptObject("CharacterBody", "Component");
             component.Set("velocity", mode3D ? new VelvVector3(0, 0, 0) : (object)new VelvVector2(0, 0));
             component.Set("position", position);
             component.Set("on_ground", false);
-            scriptObject.Set(item.Type, component);
+            var legacyName = item.Type is "CharacterBody3D" or "CharacterBody2D"
+                ? item.Type
+                : mode3D ? "CharacterBody3D" : "CharacterBody2D";
+            scriptObject.Set(legacyName, component);
+            if (!string.Equals(legacyName, "CharacterBody", StringComparison.OrdinalIgnoreCase))
+                scriptObject.Set("CharacterBody", component);
         }
 
         return scriptObject;
@@ -724,8 +736,7 @@ public sealed class GameSession : IScriptHost
                     SceneObjectChanged?.Invoke(scene.Key, sceneObject);
                 }
 
-                if (scriptObject.TryGet(sceneObject.Type, out var component) && component is ScriptObject body &&
-                    body.TryGet("position", out _))
+                if (FindBodyObject(scriptObject) is { } body && body.TryGet("position", out _))
                     body.Set("position", scriptObject.Properties["position"]);
             }
         }
@@ -837,11 +848,130 @@ public sealed class GameSession : IScriptHost
         return ground;
     }
 
+    /// <summary>
+    /// Resolve colisões entre corpos de personagem e corpos estáticos usando
+    /// AABB. Funciona com BoxCollider, SphereCollider e MeshCollider (que usa
+    /// as dimensões do modelo importado, sem precisar desenhar a colisão).
+    /// </summary>
+    private void ResolveBodyCollisions()
+    {
+        foreach (var scene in _scenes.Values)
+        {
+            var is3D = scene.Document.Is3D;
+            foreach (var item in scene.Document.Objects)
+            {
+                if (!item.Visible || !IsCharacterBody(item)) continue;
+
+                var scriptObject = scene.Objects.TryGetValue(item.Id, out var bound) ? bound : null;
+                if (scriptObject is not null && FindBodyObject(scriptObject) is { } bodyObject)
+                    bodyObject.Set("on_ground", false);
+
+                for (var pass = 0; pass < 4; pass++)
+                {
+                    var bounds = GetBounds(scene, item);
+                    var pushed = false;
+
+                    foreach (var other in scene.Document.Objects)
+                    {
+                        if (ReferenceEquals(other, item) || !other.Visible || !IsStaticCollider(other)) continue;
+                        if (_project is not null && !_project.Info.LayersCollide(item.Layer, other.Layer)) continue;
+
+                        var otherBounds = GetBounds(scene, other);
+                        if (!bounds.Intersects(otherBounds)) continue;
+
+                        var overlapX = Math.Min(bounds.MaxX, otherBounds.MaxX) - Math.Max(bounds.MinX, otherBounds.MinX);
+                        var overlapY = Math.Min(bounds.MaxY, otherBounds.MaxY) - Math.Max(bounds.MinY, otherBounds.MinY);
+                        var overlapZ = is3D
+                            ? Math.Min(bounds.MaxZ, otherBounds.MaxZ) - Math.Max(bounds.MinZ, otherBounds.MinZ)
+                            : double.MaxValue;
+
+                        var axis = 0;
+                        if (overlapY < overlapX && overlapY <= overlapZ) axis = 1;
+                        else if (overlapZ < overlapX) axis = 2;
+
+                        var centerX = (bounds.MinX + bounds.MaxX) * 0.5;
+                        var centerY = (bounds.MinY + bounds.MaxY) * 0.5;
+                        var centerZ = (bounds.MinZ + bounds.MaxZ) * 0.5;
+                        var otherX = (otherBounds.MinX + otherBounds.MaxX) * 0.5;
+                        var otherY = (otherBounds.MinY + otherBounds.MaxY) * 0.5;
+                        var otherZ = (otherBounds.MinZ + otherBounds.MaxZ) * 0.5;
+
+                        var whole = new Vector3(0, 0, 0);
+                        var grounded = false;
+
+                        if (axis == 1)
+                        {
+                            if (centerY >= otherY)
+                            {
+                                whole.Y = (float)(otherBounds.MaxY - bounds.MinY);
+                                grounded = true;
+                            }
+                            else
+                            {
+                                whole.Y = -(float)(bounds.MaxY - otherBounds.MinY);
+                            }
+                        }
+                        else if (axis == 0)
+                        {
+                            whole.X = (float)(overlapX * (centerX >= otherX ? 1 : -1));
+                        }
+                        else
+                        {
+                            whole.Z = (float)(overlapZ * (centerZ >= otherZ ? 1 : -1));
+                        }
+
+                        var local = SceneGraph.WorldDeltaToLocalParent(scene.Document, item, whole);
+                        item.Position =
+                        [
+                            item.X + local.X,
+                            item.Y + local.Y,
+                            item.Z + local.Z
+                        ];
+
+                        if (grounded)
+                        {
+                            var key = $"{scene.Key}/{item.Id}";
+                            if (_bodyVelocities.TryGetValue(key, out var velocity))
+                                _bodyVelocities[key] = new VelvVector3(velocity.X, 0, velocity.Z);
+                            if (scriptObject is not null && FindBodyObject(scriptObject) is { } body)
+                                body.Set("on_ground", true);
+                        }
+
+                        SyncScriptPosition(scene, item);
+                        SceneObjectChanged?.Invoke(scene.Key, item);
+                        pushed = true;
+                        break;
+                    }
+
+                    if (!pushed) break;
+                }
+            }
+        }
+    }
+
+    private static bool IsCharacterBody(SceneObject item)
+    {
+        if (item.Type is "CharacterBody3D" or "CharacterBody2D") return true;
+        return item.GetComponent("CharacterBody") is { Enabled: true };
+    }
+
+    private static bool IsStaticCollider(SceneObject item)
+    {
+        if (item.Type == "StaticBody3D") return true;
+        if (item.GetComponent("StaticBody") is { Enabled: true }) return true;
+        if (item.GetComponent("BoxCollider") is { Enabled: true, Trigger: false }) return true;
+        if (item.GetComponent("SphereCollider") is { Enabled: true, Trigger: false }) return true;
+        return item.GetComponent("MeshCollider") is { Enabled: true, Trigger: false };
+    }
+
     private static bool IsSolid(SceneObject item)
     {
-        if (item.Type is "Box" or "Sphere" or "Model3D" or "CharacterBody3D" or "CharacterBody2D") return true;
+        if (item.Type is "Box" or "Sphere" or "Model3D" or "CharacterBody3D" or "CharacterBody2D" or "StaticBody3D")
+            return true;
+        if (item.HasComponent("CharacterBody") || item.HasComponent("StaticBody")) return true;
         if (item.IsGameObject && item.HasComponent("MeshRenderer")) return true;
-        return item.HasComponent("BoxCollider") || item.HasComponent("SphereCollider");
+        return item.HasComponent("BoxCollider") || item.HasComponent("SphereCollider") ||
+               item.HasComponent("MeshCollider");
     }
 
     private void UpdateTriggers()
@@ -906,11 +1036,14 @@ public sealed class GameSession : IScriptHost
         collider = null!;
         var box = item.GetComponent("BoxCollider");
         var sphere = item.GetComponent("SphereCollider");
-        var isCharacter = item.Type is "CharacterBody3D" or "CharacterBody2D";
+        var mesh = item.GetComponent("MeshCollider");
+        var isCharacter = item.Type is "CharacterBody3D" or "CharacterBody2D" ||
+                          item.HasComponent("CharacterBody");
+        var isStatic = item.Type == "StaticBody3D" || item.HasComponent("StaticBody");
 
-        if (box is null && sphere is null && !isCharacter) return false;
+        if (box is null && sphere is null && mesh is null && !isCharacter && !isStatic) return false;
 
-        var component = box ?? sphere;
+        var component = box ?? sphere ?? mesh;
         var trigger = component is { Enabled: true, Trigger: true };
         collider = new ColliderRef(scene, item, GetBounds(scene, item), trigger);
         return true;
@@ -918,21 +1051,10 @@ public sealed class GameSession : IScriptHost
 
     private static SceneBounds GetBounds(SceneInstance scene, SceneObject item)
     {
-        if (!scene.Document.Is3D)
-        {
-            var width = item.Size is { Length: > 0 } ? Math.Max(0.05, item.Size[0]) : Math.Max(0.05, item.Scale[0]);
-            var height = item.Size is { Length: > 1 } ? Math.Max(0.05, item.Size[1]) : Math.Max(0.05, item.Scale[1]);
-            return new SceneBounds(
-                item.X - width / 2, item.Y - height / 2, -0.5,
-                item.X + width / 2, item.Y + height / 2, 0.5);
-        }
-
-        var halfX = Math.Max(0.05, item.Scale[0] * 0.5);
-        var halfZ = Math.Max(0.05, item.Scale[2] * 0.5);
-        var height3D = Math.Max(0.05, item.Scale[1]);
-        return new SceneBounds(
-            item.X - halfX, item.Y, item.Z - halfZ,
-            item.X + halfX, item.Y + height3D, item.Z + halfZ);
+        // SceneGraph respeita pais, rotação e escala do modelo, então a colisão
+        // acompanha exatamente o que o viewport desenha (inclusive filhos).
+        var (min, max) = SceneGraph.WorldBounds(scene.Document, item);
+        return new SceneBounds(min.X, min.Y, min.Z, max.X, max.Y, max.Z);
     }
 
     private void RaiseTrigger(SceneInstance scene, SceneObject item, SceneObject other, string function)
@@ -956,6 +1078,14 @@ public sealed class GameSession : IScriptHost
             ? $"{sceneKey}|{firstId}|{secondId}"
             : $"{sceneKey}|{secondId}|{firstId}";
 
+    private static ScriptObject? FindBodyObject(ScriptObject scriptObject)
+    {
+        if (scriptObject.TryGet("CharacterBody", out var generic) && generic is ScriptObject body) return body;
+        if (scriptObject.TryGet("CharacterBody3D", out var body3D) && body3D is ScriptObject body3DObject) return body3DObject;
+        if (scriptObject.TryGet("CharacterBody2D", out var body2D) && body2D is ScriptObject body2DObject) return body2DObject;
+        return null;
+    }
+
     private static void SyncScriptPosition(SceneInstance scene, SceneObject item)
     {
         if (!scene.Objects.TryGetValue(item.Id, out var scriptObject)) return;
@@ -973,8 +1103,7 @@ public sealed class GameSession : IScriptHost
             var binding = scene.Bindings.FirstOrDefault(item => ReferenceEquals(item.Script, scriptObject));
             if (binding is null) continue;
 
-            if (scriptObject.TryGet(binding.Scene.Type, out var component) && component is ScriptObject body &&
-                body.TryGet("velocity", out var bodyVelocity))
+            if (FindBodyObject(scriptObject) is { } body && body.TryGet("velocity", out var bodyVelocity))
                 velocity = bodyVelocity;
             break;
         }

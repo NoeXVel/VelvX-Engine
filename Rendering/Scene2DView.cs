@@ -38,6 +38,7 @@ public sealed class Scene2DView : FrameworkElement
     private SceneObject? _gameCamera;
     private string? _selectedId;
     private double _zoom = 56;
+    private double _zoomTarget = 56;
     private Vector _pan;
     private Point _lastMouse;
     private bool _panning;
@@ -62,7 +63,7 @@ public sealed class Scene2DView : FrameworkElement
 
         _timer = new DispatcherTimer(DispatcherPriority.Render)
         {
-            Interval = TimeSpan.FromMilliseconds(40)
+            Interval = TimeSpan.FromMilliseconds(16)
         };
         _timer.Tick += (_, _) => Tick();
         _timer.Start();
@@ -91,6 +92,7 @@ public sealed class Scene2DView : FrameworkElement
     public void ResetView()
     {
         _zoom = 56;
+        _zoomTarget = 56;
         _pan = new Vector();
         InvalidateVisual();
     }
@@ -117,7 +119,7 @@ public sealed class Scene2DView : FrameworkElement
 
         if (!IsPlaying && _keys.Count > 0)
         {
-            var speed = 320 * delta;
+            var speed = 420 * delta;
             if (_keys.Contains(Key.LeftShift)) speed *= 2;
             if (_keys.Contains(Key.W) || _keys.Contains(Key.Up)) _pan.Y += speed;
             if (_keys.Contains(Key.S) || _keys.Contains(Key.Down)) _pan.Y -= speed;
@@ -126,7 +128,16 @@ public sealed class Scene2DView : FrameworkElement
             InvalidateVisual();
         }
 
-        if (_scene?.Objects.Any(item => item.Type == "Sprite" && item.Visible) == true)
+        if (!IsPlaying && Math.Abs(_zoomTarget - _zoom) > 0.001)
+        {
+            var blend = 1 - Math.Exp(-delta * 16);
+            _zoom += (_zoomTarget - _zoom) * blend;
+            if (Math.Abs(_zoomTarget - _zoom) < 0.001) _zoom = _zoomTarget;
+            InvalidateVisual();
+        }
+
+        if (_scene?.Objects.Any(item => item.Type == "Sprite" && item.Visible) == true ||
+            _scene?.Objects.Any(item => item.HasComponent("ParticleEmitter")) == true)
             InvalidateVisual();
     }
 
@@ -142,7 +153,8 @@ public sealed class Scene2DView : FrameworkElement
                 ActualWidth / 2 - _gameCamera.X * _zoom,
                 ActualHeight / 2 + _gameCamera.Y * _zoom);
         }
-        DrawGrid(dc, center);
+
+        if (!IsPlaying) DrawGrid(dc, center);
 
         if (_scene is null) return;
 
@@ -150,15 +162,16 @@ public sealed class Scene2DView : FrameworkElement
         {
             if (!item.Visible) continue;
             if (item.Type is "Camera3D" or "DirectionalLight" or "GlobalVolume") continue;
+            if (IsPlaying && item.Type == "Camera2D") continue;
 
             if (item.IsVolume)
             {
-                DrawVolume(dc, item, center);
+                if (!IsPlaying) DrawVolume(dc, item, center);
                 continue;
             }
 
             var position = new Point(center.X + item.X * _zoom, center.Y - item.Y * _zoom);
-            var selected = string.Equals(item.Id, _selectedId, StringComparison.OrdinalIgnoreCase);
+            var selected = !IsPlaying && string.Equals(item.Id, _selectedId, StringComparison.OrdinalIgnoreCase);
 
             if (item.Type == "Camera2D")
             {
@@ -201,15 +214,20 @@ public sealed class Scene2DView : FrameworkElement
             if (selected && item.Type != "Sprite")
                 dc.DrawRectangle(null, SelectedPen, rect);
 
-            var label = new FormattedText(
-                item.Name,
-                CultureInfo.CurrentUICulture,
-                FlowDirection.LeftToRight,
-                new Typeface("Segoe UI"),
-                10,
-                LabelBrush,
-                VisualTreeHelper.GetDpi(this).PixelsPerDip);
-            dc.DrawText(label, new Point(rect.Left, rect.Top - label.Height - 4));
+            if (!IsPlaying)
+            {
+                var label = new FormattedText(
+                    item.Name,
+                    CultureInfo.CurrentUICulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface("Segoe UI"),
+                    10,
+                    LabelBrush,
+                    VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                dc.DrawText(label, new Point(rect.Left, rect.Top - label.Height - 4));
+            }
+
+            DrawParticles(dc, item, center);
 
             if (selected) DrawGizmo(dc, position);
         }
@@ -238,6 +256,59 @@ public sealed class Scene2DView : FrameworkElement
             new SolidColorBrush(Color.FromArgb(28, color.R, color.G, color.B)),
             new Pen(new SolidColorBrush(Color.FromArgb(120, color.R, color.G, color.B)), 1),
             rect, 6, 6);
+    }
+
+    private void DrawParticles(DrawingContext dc, SceneObject item, Point center)
+    {
+        var emitter = item.GetComponent("ParticleEmitter");
+        if (emitter is not { Enabled: true }) return;
+
+        var count = (int)Math.Clamp(emitter.Amount, 1, 600);
+        var life = Math.Max(0.1, emitter.Lifetime);
+        var speed = Math.Max(0, emitter.Speed);
+        var radius = Math.Max(1, Math.Max(0.01, emitter.ParticleSize) * _zoom);
+        var baseColor = ParseColor(emitter.Color);
+        var now = _clock.Elapsed.TotalSeconds;
+
+        for (var index = 0; index < count; index++)
+        {
+            var seed = DeterministicSeed(index, item.Id);
+            var phase = now / life + (seed % 997) / 997.0;
+            var cycle = phase - Math.Floor(phase);
+            var age = cycle * life;
+
+            var angle = (seed % 3600) / 3600.0 * Math.PI * 2;
+            var spread = 0.25 + (seed % 257) / 257.0;
+            var velocityX = Math.Cos(angle) * speed * spread;
+            var velocityY = Math.Sin(angle) * speed * spread * 0.55 + speed * 0.35;
+
+            var x = item.X + velocityX * age;
+            var y = item.Y + velocityY * age -
+                    (emitter.UseGravity ? 0.5 * Math.Max(0, emitter.Gravity) * age * age : 0);
+
+            var alpha = (byte)Math.Clamp(230 * (1 - cycle), 0, 255);
+            var size = Math.Max(1, radius * (1.15 - cycle * 0.65));
+            var brush = new SolidColorBrush(Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B));
+            brush.Freeze();
+            dc.DrawEllipse(brush, null, new Point(center.X + x * _zoom, center.Y - y * _zoom), size, size);
+        }
+    }
+
+    private static int DeterministicSeed(int index, string id)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var character in id)
+            {
+                hash ^= character;
+                hash *= 16777619u;
+            }
+            hash ^= (uint)index;
+            hash *= 16777619u;
+            hash ^= hash >> 13;
+            return (int)(hash & 0x7FFFFFFF);
+        }
     }
 
     private void DrawGizmo(DrawingContext dc, Point origin)
@@ -403,8 +474,18 @@ public sealed class Scene2DView : FrameworkElement
 
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
+        var cursor = e.GetPosition(this);
+        var worldX = (cursor.X - ActualWidth / 2 - _pan.X) / _zoom;
+        var worldY = -(cursor.Y - ActualHeight / 2 - _pan.Y) / _zoom;
+
         var factor = Math.Pow(1.12, e.Delta / 120.0);
-        _zoom = Math.Clamp(_zoom * factor, 14, 360);
+        _zoomTarget = Math.Clamp(_zoomTarget * factor, 14, 360);
+
+        // Mantém o ponto sob o cursor no mesmo lugar enquanto o zoom anima.
+        _pan = new Vector(
+            cursor.X - ActualWidth / 2 - worldX * _zoomTarget,
+            cursor.Y - ActualHeight / 2 + worldY * _zoomTarget);
+
         InvalidateVisual();
     }
 

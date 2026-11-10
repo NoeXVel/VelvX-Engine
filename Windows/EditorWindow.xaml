@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:rendering="clr-namespace:VelvX.Engine.Rendering"
         xmlns:avalonedit="http://icsharpcode.net/sharpdevelop/avalonedit"
+        xmlns:local="clr-namespace:VelvX.Engine.Windows"
         Title="VelvX Editor"
         Height="840" Width="1500" MinHeight="620" MinWidth="1080"
         WindowStartupLocation="CenterScreen" WindowState="Maximized"
@@ -15,6 +16,28 @@
         KeyDown="Window_KeyDown"
         PreviewKeyDown="Window_PreviewKeyDown"
         PreviewKeyUp="Window_PreviewKeyUp">
+
+  <Window.Resources>
+    <HierarchicalDataTemplate x:Key="HierarchyNodeTemplate" ItemsSource="{Binding Children}">
+      <Grid Height="32" MinWidth="140">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="22" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Text="{Binding Object.Glyph}" Foreground="#B7A4FF" FontSize="13"
+                   VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+          <TextBlock Text="{Binding Object.Name}" FontSize="11.5" Foreground="#E3DFEF"
+                     TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding Object.Type}" FontSize="8.5" Foreground="#707585"
+                     Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <TextBlock Grid.Column="2" Text="{Binding StateMark}" FontSize="9" Foreground="#5A5E6D"
+                   VerticalAlignment="Center" ToolTip="Visibilidade no editor" />
+      </Grid>
+    </HierarchicalDataTemplate>
+  </Window.Resources>
 
   <Grid>
     <Grid.RowDefinitions>
@@ -34,7 +57,7 @@
           <Button x:Name="MenuViewButton" Content="Janela" Tag="view" Style="{StaticResource GhostButton}" FontSize="12" Padding="11,4" Click="Menu_Click" />
           <Button x:Name="MenuHelpButton" Content="Ajuda" Tag="help" Style="{StaticResource GhostButton}" FontSize="12" Padding="11,4" Click="Menu_Click" />
         </StackPanel>
-        <TextBlock x:Name="EngineVersionText" DockPanel.Dock="Right" Text="VelvX Engine 0.3.0 · Bigorna" FontSize="9.5" Foreground="#5E6372" VerticalAlignment="Center" />
+        <TextBlock x:Name="EngineVersionText" DockPanel.Dock="Right" Text="VelvX Engine 0.4.0 · Bigorna" FontSize="9.5" Foreground="#5E6372" VerticalAlignment="Center" />
       </DockPanel>
     </Border>
 
@@ -71,298 +94,347 @@
     <!-- Área principal -->
     <Grid Grid.Row="2">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="238" />
+        <ColumnDefinition Width="256" />
         <ColumnDefinition Width="5" />
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="5" />
-        <ColumnDefinition Width="320" />
+        <ColumnDefinition Width="326" />
       </Grid.ColumnDefinitions>
 
-      <!-- Hierarquia -->
+      <!-- Coluna esquerda: hierarquia + recursos -->
       <Border Grid.Column="0" Background="{StaticResource PanelDeep}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
-        <Grid Margin="12,12,12,10">
+        <Grid>
           <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="2.25*" MinHeight="190" />
+            <RowDefinition Height="5" />
+            <RowDefinition Height="1.35*" MinHeight="150" />
           </Grid.RowDefinitions>
 
-          <DockPanel>
-            <TextBlock Text="HIERARQUIA" Style="{StaticResource SectionLabel}" Margin="0" VerticalAlignment="Center" />
-            <Button x:Name="DeleteHierarchyButton" DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="×" Width="24" Height="24" FontSize="14" Click="DeleteObject_Click" ToolTip="Excluir objeto selecionado" Margin="2,0,0,0" />
-            <Button x:Name="DuplicateHierarchyButton" DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="⧉" Width="24" Height="24" FontSize="12" Click="DuplicateObject_Click" ToolTip="Duplicar objeto" Margin="2,0,0,0" />
-            <Button x:Name="AddObjectButton" DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="+" Width="24" Height="24" FontSize="15" Click="AddObject_Click" ToolTip="Adicionar objeto à cena" Margin="2,0,0,0" />
-          </DockPanel>
+          <!-- Hierarquia -->
+          <Grid Grid.Row="0" Margin="12,12,12,8">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-          <Border Grid.Row="1" Background="#12141A" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="7" Margin="0,10,0,6" Padding="8,5">
             <DockPanel>
-              <TextBlock Text="⌕" Foreground="#6F7382" Margin="0,0,6,0" VerticalAlignment="Center" />
-              <TextBox x:Name="HierarchySearchBox" BorderThickness="0" Background="Transparent" Padding="0" MinHeight="20"
-                       FontSize="11.5" Foreground="{StaticResource Text}" VerticalContentAlignment="Center"
-                       TextChanged="HierarchySearch_TextChanged" />
+              <TextBlock Text="ATORES" Style="{StaticResource SectionLabel}" Margin="0" VerticalAlignment="Center" />
+              <Button x:Name="DeleteHierarchyButton" DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="×" Width="24" Height="24" FontSize="14" Click="DeleteObject_Click" ToolTip="Excluir ator selecionado" Margin="2,0,0,0" />
+              <Button x:Name="DuplicateHierarchyButton" DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="⧉" Width="24" Height="24" FontSize="12" Click="DuplicateObject_Click" ToolTip="Duplicar ator" Margin="2,0,0,0" />
+              <Button x:Name="AddObjectButton" DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="+" Width="24" Height="24" FontSize="15" Click="AddObject_Click" ToolTip="Adicionar ator à cena" Margin="2,0,0,0" />
             </DockPanel>
-          </Border>
-          <TextBlock Grid.Row="1" Text="Filtrar objetos..." x:Name="HierarchySearchHint" FontSize="11" Foreground="#5C6170" Margin="24,14,0,0" IsHitTestVisible="False" />
 
-          <DockPanel Grid.Row="2" Margin="0,0,0,8">
-            <Button x:Name="SceneSelectorButton" Style="{StaticResource GhostButton}" Padding="9,6" Click="SceneSelector_Click" HorizontalAlignment="Stretch" ToolTip="Trocar de cena">
+            <Border Grid.Row="1" Background="#12141A" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="7" Margin="0,10,0,6" Padding="8,5">
               <DockPanel>
-                <TextBlock Text="◇" Foreground="{StaticResource Accent}" Margin="0,0,7,0" VerticalAlignment="Center" />
-                <TextBlock Text="▾" Foreground="#757A8A" DockPanel.Dock="Right" VerticalAlignment="Center" />
-                <TextBlock x:Name="SceneNameText" Text="Main" FontSize="11.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="⌕" Foreground="#6F7382" Margin="0,0,6,0" VerticalAlignment="Center" />
+                <TextBox x:Name="HierarchySearchBox" BorderThickness="0" Background="Transparent" Padding="0" MinHeight="20"
+                         FontSize="11.5" Foreground="{StaticResource Text}" VerticalContentAlignment="Center"
+                         TextChanged="HierarchySearch_TextChanged" />
               </DockPanel>
-            </Button>
-            <Button Style="{StaticResource IconButton}" Content="+" Width="26" Height="28" Margin="5,0,0,0" Click="NewScene_Click" ToolTip="Criar nova cena" />
-          </DockPanel>
+            </Border>
+            <TextBlock Grid.Row="1" Text="Filtrar atores..." x:Name="HierarchySearchHint" FontSize="11" Foreground="#5C6170" Margin="24,14,0,0" IsHitTestVisible="False" />
 
-          <ListBox x:Name="HierarchyList" Grid.Row="3" SelectionChanged="Hierarchy_SelectionChanged"
-                   AllowDrop="True" Drop="HierarchyList_Drop" PreviewMouseLeftButtonDown="HierarchyList_PreviewMouseLeftButtonDown"
-                   PreviewMouseMove="HierarchyList_PreviewMouseMove">
-            <ListBox.ContextMenu>
-              <ContextMenu>
-                <MenuItem Header="Duplicar objeto" Click="DuplicateObject_Click" />
-                <MenuItem Header="Criar prefab a partir do objeto" Click="CreatePrefabFromObject_Click" />
-                <MenuItem Header="Definir como câmera do jogo" Click="SetAsGameCamera_Click" />
-                <MenuItem Header="Excluir objeto" Click="DeleteObject_Click" />
-              </ContextMenu>
-            </ListBox.ContextMenu>
-            <ListBox.ItemTemplate>
-              <DataTemplate>
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="22" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBlock Text="{Binding Glyph}" Foreground="#B7A4FF" FontSize="13" VerticalAlignment="Center" />
-                  <StackPanel Grid.Column="1">
-                    <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding Type}" FontSize="9" Foreground="#707585" Margin="0,1,0,0" />
-                  </StackPanel>
-                  <TextBlock Grid.Column="2" Text="○" FontSize="10" Foreground="#5A5E6D" VerticalAlignment="Center" ToolTip="Objeto visível no editor" />
-                </Grid>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-
-          <StackPanel Grid.Row="4" Margin="0,10,0,0">
-            <Border Height="1" Background="{StaticResource Line}" Margin="0,0,0,10" />
-            <DockPanel>
-              <TextBlock x:Name="HierarchyCountText" Text="0" DockPanel.Dock="Right" FontSize="9.5" Foreground="#6F7382" VerticalAlignment="Center" />
-              <TextBlock Text="CENAS CARREGADAS" Style="{StaticResource SectionLabel}" Margin="0" VerticalAlignment="Center" />
+            <DockPanel Grid.Row="2" Margin="0,0,0,8">
+              <Button x:Name="SceneSelectorButton" Style="{StaticResource GhostButton}" Padding="9,6" Click="SceneSelector_Click" HorizontalAlignment="Stretch" ToolTip="Trocar de cena">
+                <DockPanel>
+                  <TextBlock Text="◇" Foreground="{StaticResource Accent}" Margin="0,0,7,0" VerticalAlignment="Center" />
+                  <TextBlock Text="▾" Foreground="#757A8A" DockPanel.Dock="Right" VerticalAlignment="Center" />
+                  <TextBlock x:Name="SceneNameText" Text="Main" FontSize="11.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
+              </Button>
+              <Button Style="{StaticResource IconButton}" Content="+" Width="26" Height="28" Margin="5,0,0,0" Click="NewScene_Click" ToolTip="Criar nova cena" />
             </DockPanel>
-            <TextBlock x:Name="LoadedScenesText" Text="Fora de execução." FontSize="10" Foreground="#8A8E9E" TextWrapping="Wrap" LineHeight="15" Margin="0,2,0,0" />
-          </StackPanel>
+
+            <TreeView x:Name="HierarchyList" Grid.Row="3"
+                      ItemTemplate="{StaticResource HierarchyNodeTemplate}"
+                      SelectedItemChanged="Hierarchy_SelectionChanged"
+                      AllowDrop="True" Drop="HierarchyList_Drop"
+                      PreviewMouseLeftButtonDown="HierarchyList_PreviewMouseLeftButtonDown"
+                      PreviewMouseRightButtonDown="HierarchyList_PreviewMouseRightButtonDown"
+                      PreviewMouseMove="HierarchyList_PreviewMouseMove">
+              <TreeView.ItemContainerStyle>
+                <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                  <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                  <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                  <EventSetter Event="Expanded" Handler="Hierarchy_Expanded" />
+                  <EventSetter Event="Collapsed" Handler="Hierarchy_Collapsed" />
+                </Style>
+              </TreeView.ItemContainerStyle>
+              <TreeView.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="Duplicar ator" Click="DuplicateObject_Click" />
+                  <MenuItem Header="Criar prefab a partir do ator" Click="CreatePrefabFromObject_Click" />
+                  <MenuItem Header="Definir como câmera do jogo" Click="SetAsGameCamera_Click" />
+                  <MenuItem Header="Tornar ator raiz" Click="MakeRoot_Click" />
+                  <MenuItem Header="Excluir ator" Click="DeleteObject_Click" />
+                </ContextMenu>
+              </TreeView.ContextMenu>
+            </TreeView>
+
+            <StackPanel Grid.Row="4" Margin="0,8,0,0">
+              <Border Height="1" Background="{StaticResource Line}" Margin="0,0,0,8" />
+              <DockPanel>
+                <TextBlock x:Name="HierarchyCountText" Text="0" DockPanel.Dock="Right" FontSize="9.5" Foreground="#6F7382" VerticalAlignment="Center" />
+                <TextBlock Text="CENAS CARREGADAS" Style="{StaticResource SectionLabel}" Margin="0" VerticalAlignment="Center" />
+              </DockPanel>
+              <TextBlock x:Name="LoadedScenesText" Text="Fora de execução." FontSize="10" Foreground="#8A8E9E" TextWrapping="Wrap" LineHeight="15" Margin="0,2,0,0" />
+            </StackPanel>
+          </Grid>
+
+          <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" Background="#0A0B10" ShowsPreview="False" />
+
+          <!-- Recursos -->
+          <Grid Grid.Row="2" Margin="12,8,12,10">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <DockPanel Margin="0,0,0,6">
+              <TextBlock Text="RECURSOS" Style="{StaticResource SectionLabel}" Margin="0" VerticalAlignment="Center" />
+              <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                <Button x:Name="NewFolderButton" Style="{StaticResource IconButton}" Content="▣+" Width="24" Height="24" FontSize="10" Click="NewFolder_Click" ToolTip="Nova pasta na seleção" Margin="0,0,3,0" />
+                <Button x:Name="NewScriptButton" Style="{StaticResource IconButton}" Content="≡+" Width="24" Height="24" FontSize="10" Click="NewScript_Click" ToolTip="Novo script na seleção" Margin="0,0,3,0" />
+                <Button x:Name="ResourceNewButton" Style="{StaticResource IconButton}" Content="+" Width="24" Height="24" FontSize="14" Click="ResourceNew_Click" ToolTip="Criar prefab" Margin="0,0,3,0" />
+                <Button Style="{StaticResource IconButton}" Content="↻" Width="24" Height="24" FontSize="12" Click="RefreshResources_Click" ToolTip="Atualizar recursos" />
+              </StackPanel>
+            </DockPanel>
+
+            <TreeView x:Name="ResourceTree" Grid.Row="1" Padding="2,2"
+                      AllowDrop="True" Drop="ResourceTree_Drop"
+                      MouseDoubleClick="ResourceTree_MouseDoubleClick"
+                      PreviewMouseLeftButtonDown="ResourceTree_PreviewMouseLeftButtonDown"
+                      PreviewMouseMove="ResourceTree_PreviewMouseMove"
+                      ContextMenuOpening="ResourceTree_ContextMenuOpening">
+              <TreeView.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="Abrir / instanciar" Click="ResourceOpen_Click" />
+                  <MenuItem Header="Novo script aqui…" Click="NewScript_Click" />
+                  <MenuItem Header="Nova pasta aqui…" Click="NewFolder_Click" />
+                  <MenuItem Header="Renomear…" Click="ResourceRename_Click" />
+                  <MenuItem Header="Mostrar no Explorer" Click="ResourceReveal_Click" />
+                  <Separator />
+                  <MenuItem Header="Excluir arquivo" Click="ResourceDelete_Click" />
+                </ContextMenu>
+              </TreeView.ContextMenu>
+            </TreeView>
+
+            <TextBlock Grid.Row="2" Text="Arraste objetos, arquivos e pastas. Use o menu de contexto para organizar."
+                       FontSize="9" Foreground="#6F7382" TextWrapping="Wrap" LineHeight="13" Margin="0,6,0,0" />
+          </Grid>
         </Grid>
       </Border>
 
       <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#0A0B10" ShowsPreview="False" />
 
-      <!-- Viewport + painéis inferiores -->
+      <!-- Centro: workspace com abas -->
       <Grid Grid.Column="2">
         <Grid.RowDefinitions>
+          <RowDefinition Height="38" />
           <RowDefinition Height="*" />
           <RowDefinition Height="5" />
-          <RowDefinition Height="336" />
+          <RowDefinition Height="164" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Background="#0A0B10" ClipToBounds="True">
-          <Grid x:Name="ViewportHost" AllowDrop="True" Drop="ViewportHost_Drop" DragOver="ViewportHost_DragOver">
-            <rendering:Scene3DView x:Name="View3D" />
-            <rendering:Scene2DView x:Name="View2D" Visibility="Collapsed" />
-
-            <Border VerticalAlignment="Top" HorizontalAlignment="Left" Margin="16" Background="#D911131A" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="8" Padding="10,6" IsHitTestVisible="False">
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="◇" Foreground="{StaticResource Accent}" Margin="0,0,7,0" VerticalAlignment="Center" />
-                <TextBlock x:Name="ViewportSceneText" Text="Main" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <Border Background="#28213F" CornerRadius="4" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
-                  <TextBlock x:Name="ViewportModeText" Text="3D" FontSize="8.5" FontWeight="Bold" Foreground="#CBBAFF" />
-                </Border>
-              </StackPanel>
-            </Border>
-
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="16">
-              <Button Style="{StaticResource GhostButton}" Content="Focar" FontSize="10.5" Padding="10,5" Click="FocusSelected_Click" ToolTip="Centralizar a câmera no objeto selecionado" />
-              <Button Style="{StaticResource GhostButton}" Content="Resetar" FontSize="10.5" Padding="10,5" Click="ResetCamera_Click" Margin="4,0,0,0" />
+        <Border Grid.Row="0" Background="#0B0D12" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
+          <DockPanel Margin="8,0" LastChildFill="False">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Stretch">
+              <Button x:Name="WorkspaceTabScene" Tag="scene" Style="{StaticResource WorkspaceTabActive}" Click="WorkspaceTab_Click">
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="◇" Margin="0,0,6,0" VerticalAlignment="Center" />
+                  <TextBlock Text="Cena" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <Button x:Name="WorkspaceTabScript" Tag="script" Style="{StaticResource WorkspaceTab}" Click="WorkspaceTab_Click">
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="≡" Margin="0,0,6,0" VerticalAlignment="Center" />
+                  <TextBlock Text="Script" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ScriptTabLabel" Text="" FontSize="9.5" Foreground="#8A8E9E"
+                             Margin="6,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <Button x:Name="WorkspaceTabPlay" Tag="play" Style="{StaticResource WorkspaceTab}" Click="WorkspaceTab_Click">
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="▶" Margin="0,0,6,0" VerticalAlignment="Center" />
+                  <TextBlock Text="Jogo" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
             </StackPanel>
-
-            <Border VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="16" Background="#B311131A" CornerRadius="7" Padding="9,5" IsHitTestVisible="False">
-              <TextBlock x:Name="ViewportHintText" Text="WASD mover · botão direito orbitar · setas coloridas movem o objeto" FontSize="10" Foreground="#8D91A1" />
-            </Border>
-
-            <Border x:Name="PlayOverlay" Visibility="Collapsed" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="16,58,16,0" Background="#1E3A2F" BorderBrush="#2F6B52" BorderThickness="1" CornerRadius="20" Padding="12,6">
-              <StackPanel Orientation="Horizontal">
-                <Ellipse Width="7" Height="7" Fill="#6EE7B7" Margin="0,0,7,0" VerticalAlignment="Center" />
-                <TextBlock Text="EXECUTANDO" FontSize="9.5" FontWeight="Bold" Foreground="#A7F3D0" />
-              </StackPanel>
-            </Border>
-          </Grid>
+            <TextBlock x:Name="WorkspaceInfoText" DockPanel.Dock="Right" Text="" FontSize="9.5"
+                       Foreground="#6F7382" VerticalAlignment="Center" Margin="10,0,4,0" />
+          </DockPanel>
         </Border>
 
-        <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" Background="#0A0B10" ShowsPreview="False" />
+        <Grid Grid.Row="1">
+          <!-- Workspace: Cena -->
+          <Grid x:Name="SceneWorkspace">
+            <Grid x:Name="SceneHost" AllowDrop="True" Drop="ViewportHost_Drop" DragOver="ViewportHost_DragOver" Background="#0A0B10" ClipToBounds="True">
+              <Grid x:Name="ViewportHost">
+                <rendering:Scene3DView x:Name="View3D" />
+                <rendering:Scene2DView x:Name="View2D" Visibility="Collapsed" />
 
-        <Grid Grid.Row="2">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="5" />
-            <ColumnDefinition Width="272" />
-            <ColumnDefinition Width="5" />
-            <ColumnDefinition Width="292" />
-          </Grid.ColumnDefinitions>
-
-          <!-- Editor de script -->
-          <Border Grid.Column="0" Background="{StaticResource PanelDeep}" BorderBrush="{StaticResource Line}" BorderThickness="0,1,1,0">
-            <Grid>
-              <Grid.RowDefinitions>
-                <RowDefinition Height="36" />
-                <RowDefinition Height="*" />
-              </Grid.RowDefinitions>
-
-              <DockPanel Margin="12,0">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                  <TextBlock Text="EDITOR DE SCRIPT" Style="{StaticResource SectionLabel}" Margin="0" VerticalAlignment="Center" />
-                  <Border Background="#1B1E27" CornerRadius="5" Padding="7,3" Margin="8,0,0,0">
-                    <TextBlock x:Name="ScriptFileText" Text="Main.velv" FontSize="10" Foreground="#AFA6C9" />
-                  </Border>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                  <TextBlock x:Name="ScriptDirtyText" Text="" Foreground="{StaticResource Warning}" FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0" />
-                  <Button Style="{StaticResource GhostButton}" Content="Ampliar" Padding="8,5" FontSize="11" Click="OpenLargeScript_Click" Margin="0,0,4,0" ToolTip="Abrir o editor de script completo com autocompletar e referência" />
-                  <Button Style="{StaticResource GhostButton}" Content="Ajuda" Padding="9,5" FontSize="11" Click="ToggleHelp_Click" Margin="0,0,4,0" />
-                  <Button Style="{StaticResource GhostButton}" Content="Abrir" Padding="9,5" FontSize="11" Click="OpenScript_Click" Margin="0,0,4,0" ToolTip="Abrir outro script do projeto" />
-                  <Button Style="{StaticResource GhostButton}" Content="Salvar" Padding="9,5" FontSize="11" Click="Save_Click" />
-                </StackPanel>
-              </DockPanel>
-
-              <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <avalonedit:TextEditor x:Name="ScriptEditor"
-                                       Background="#0E1015" Foreground="#DDD8EE"
-                                       FontFamily="Cascadia Mono, Consolas" FontSize="12.5"
-                                       ShowLineNumbers="True"
-                                       Padding="8,7"
-                                       HorizontalScrollBarVisibility="Auto"
-                                       VerticalScrollBarVisibility="Auto"
-                                       WordWrap="False" />
-                <Border x:Name="ScriptHelpPanel" Grid.Column="1" Width="248" Background="#101218"
-                        BorderBrush="{StaticResource Line}" BorderThickness="1,0,0,0" Visibility="Collapsed">
-                  <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,10">
-                    <StackPanel>
-                      <TextBlock Text="REFERÊNCIA RÁPIDA" Style="{StaticResource SectionLabel}" />
-                      <TextBlock Text="CICLO DE VIDA" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,2,0,4" />
-                      <TextBlock Text="func Main()  → roda uma vez" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
-                      <TextBlock Text="func InGame() → a cada quadro" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
-                      <TextBlock Text="this → objeto do componente" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,10" />
-
-                      <TextBlock Text="ENTRADA" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,4" />
-                      <TextBlock Text="game.get_input(&quot;pular&quot;)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
-                      <TextBlock Text="game.get_input_vectors(...)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
-                      <TextBlock Text="game.delta_time" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,10" />
-
-                      <TextBlock Text="CENAS / STREAMING" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,4" />
-                      <TextBlock Text="Scene(&quot;Fase 2&quot;).load()" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
-                      <TextBlock Text="Scene(&quot;Fase 1&quot;).unload()" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
-                      <TextBlock Text="Scenes.set_active(&quot;Fase 2&quot;)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,10" />
-
-                      <TextBlock Text="OBJETOS E CONSOLE" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,4" />
-                      <TextBlock Text="Assets.pathObject(&quot;Player&quot;)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
-                      <TextBlock Text="console.show(&quot;olá&quot;)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
-                      <TextBlock Text="console.warn / console.error" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,10" />
-
-                      <TextBlock Text="SINTAXE" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,4" />
-                      <TextBlock Text="var nome: Tipo = valor" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
-                      <TextBlock Text="if / else / while / return" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
-                      <TextBlock Text="## comentário" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#8EE3A8" />
-                      <TextBlock Text="Vector2, Vector3, math" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,10" />
-
-                      <Border Background="#171A22" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="7" Padding="8,7">
-                        <TextBlock Text="Os Inputs são definidos em Projeto → Configurações → Entradas. Use os nomes criados lá nos scripts." FontSize="9.5" Foreground="#9A9EAD" TextWrapping="Wrap" LineHeight="14" />
+                <Grid x:Name="EditorViewportChrome">
+                  <Border VerticalAlignment="Top" HorizontalAlignment="Left" Margin="16" Background="#D911131A" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="8" Padding="10,6" IsHitTestVisible="False">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="◇" Foreground="{StaticResource Accent}" Margin="0,0,7,0" VerticalAlignment="Center" />
+                      <TextBlock x:Name="ViewportSceneText" Text="Main" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                      <Border Background="#28213F" CornerRadius="4" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="ViewportModeText" Text="3D" FontSize="8.5" FontWeight="Bold" Foreground="#CBBAFF" />
                       </Border>
                     </StackPanel>
-                  </ScrollViewer>
+                  </Border>
+
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="16">
+                    <Button Style="{StaticResource GhostButton}" Content="Focar" FontSize="10.5" Padding="10,5" Click="FocusSelected_Click" ToolTip="Centralizar a câmera no objeto selecionado" />
+                    <Button Style="{StaticResource GhostButton}" Content="Resetar" FontSize="10.5" Padding="10,5" Click="ResetCamera_Click" Margin="4,0,0,0" />
+                  </StackPanel>
+
+                  <Border x:Name="GizmoToolbar" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,16,0,0"
+                          Background="#D911131A" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="8" Padding="4">
+                    <StackPanel Orientation="Horizontal">
+                      <Button x:Name="GizmoTranslateButton" Tag="translate" Style="{StaticResource GizmoToolActive}"
+                              Content="Mover · 1" Click="GizmoMode_Click" ToolTip="Mover no eixo ou livre pelo centro (1)" />
+                      <Button x:Name="GizmoRotateButton" Tag="rotate" Style="{StaticResource GizmoTool}"
+                              Content="Girar · 2" Click="GizmoMode_Click" Margin="3,0,0,0" ToolTip="Rotacionar em torno do eixo (2). Ctrl trava em 15°" />
+                      <Button x:Name="GizmoScaleButton" Tag="scale" Style="{StaticResource GizmoTool}"
+                              Content="Escalar · 3" Click="GizmoMode_Click" Margin="3,0,0,0" ToolTip="Escalar pelo eixo ou uniforme pelo centro (3). Ctrl trava em 0,25" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="16" Background="#B311131A" CornerRadius="7" Padding="9,5" IsHitTestVisible="False">
+                    <TextBlock x:Name="ViewportHintText" Text="WASD mover · botão direito orbitar · 1/2/3 alternam mover, girar e escalar · centro do gizmo move livre" FontSize="10" Foreground="#8D91A1" />
+                  </Border>
+                </Grid>
+
+                <Border x:Name="PlayOverlay" Visibility="Collapsed" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="16,58,16,0" Background="#1E3A2F" BorderBrush="#2F6B52" BorderThickness="1" CornerRadius="20" Padding="12,6">
+                  <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="7" Height="7" Fill="#6EE7B7" Margin="0,0,7,0" VerticalAlignment="Center" />
+                    <TextBlock Text="EXECUTANDO" FontSize="9.5" FontWeight="Bold" Foreground="#A7F3D0" />
+                  </StackPanel>
                 </Border>
               </Grid>
             </Grid>
-          </Border>
+          </Grid>
 
-          <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#0A0B10" ShowsPreview="False" />
+          <!-- Workspace: Script -->
+          <Grid x:Name="ScriptWorkspace" Visibility="Collapsed" Background="#0E1015">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="40" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-          <!-- Recursos -->
-          <Border Grid.Column="2" Background="{StaticResource PanelDeep}" BorderBrush="{StaticResource Line}" BorderThickness="0,1,1,0">
-            <Grid>
-              <Grid.RowDefinitions>
-                <RowDefinition Height="36" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-              </Grid.RowDefinitions>
-              <DockPanel Margin="12,0">
-                <TextBlock Text="RECURSOS" Style="{StaticResource SectionLabel}" Margin="0" VerticalAlignment="Center" />
+            <Border Background="{StaticResource PanelDeep}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
+              <DockPanel Margin="14,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                  <TextBlock Text="SCRIPT" Style="{StaticResource SectionLabel}" Margin="0" VerticalAlignment="Center" />
+                  <Border Background="#1B1E27" CornerRadius="5" Padding="7,3" Margin="8,0,0,0">
+                    <TextBlock x:Name="ScriptFileText" Text="Main.velv" FontSize="10" Foreground="#AFA6C9" />
+                  </Border>
+                  <TextBlock x:Name="ScriptDirtyText" Text="" Foreground="{StaticResource Warning}" FontSize="10" Margin="10,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                  <Button x:Name="ResourceNewButton" Style="{StaticResource IconButton}" Content="+" Width="24" Height="24" FontSize="14" Click="ResourceNew_Click" ToolTip="Criar prefab ou pasta" Margin="0,0,3,0" />
-                  <Button Style="{StaticResource IconButton}" Content="↻" Width="24" Height="24" FontSize="12" Click="RefreshResources_Click" ToolTip="Atualizar recursos" />
+                  <Button Style="{StaticResource GhostButton}" Content="+ Novo" Padding="9,5" FontSize="11" Click="NewScript_Click" Margin="0,0,4,0" ToolTip="Criar um novo script" />
+                  <Button Style="{StaticResource GhostButton}" Content="Abrir" Padding="9,5" FontSize="11" Click="OpenScript_Click" Margin="0,0,4,0" ToolTip="Abrir outro script do projeto" />
+                  <Button Style="{StaticResource GhostButton}" Content="Documentação" Padding="9,5" FontSize="11" Click="OpenDocs_Click" Margin="0,0,4,0" ToolTip="Abrir a documentação completa da VelvX Language" />
+                  <Button Style="{StaticResource GhostButton}" Content="Salvar" Padding="9,5" FontSize="11" Click="Save_Click" />
                 </StackPanel>
               </DockPanel>
-              <TreeView x:Name="ResourceTree" Grid.Row="1" Padding="8,2"
-                        AllowDrop="True" Drop="ResourceTree_Drop"
-                        MouseDoubleClick="ResourceTree_MouseDoubleClick"
-                        PreviewMouseLeftButtonDown="ResourceTree_PreviewMouseLeftButtonDown"
-                        PreviewMouseMove="ResourceTree_PreviewMouseMove"
-                        ContextMenuOpening="ResourceTree_ContextMenuOpening">
-                <TreeView.ContextMenu>
-                  <ContextMenu>
-                    <MenuItem Header="Abrir / instanciar" Click="ResourceOpen_Click" />
-                    <MenuItem Header="Excluir arquivo" Click="ResourceDelete_Click" />
-                  </ContextMenu>
-                </TreeView.ContextMenu>
-              </TreeView>
-              <Border Grid.Row="2" Background="#101218" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="10,7">
-                <TextBlock Text="Arraste um objeto da hierarquia para Prefabs para criar um prefab. Dê dois cliques para usar." FontSize="9" Foreground="#6F7382" TextWrapping="Wrap" LineHeight="13" />
-              </Border>
-            </Grid>
-          </Border>
+            </Border>
 
-          <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="#0A0B10" ShowsPreview="False" />
-
-          <!-- Console -->
-          <Border Grid.Column="4" Background="{StaticResource PanelDeep}" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0">
-            <Grid>
-              <Grid.RowDefinitions>
-                <RowDefinition Height="36" />
-                <RowDefinition Height="*" />
-              </Grid.RowDefinitions>
-              <DockPanel Margin="12,0">
-                <TextBlock Text="SAÍDA" Style="{StaticResource SectionLabel}" Margin="0" VerticalAlignment="Center" />
-                <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="Limpar" FontSize="10" Padding="8,5" Click="ClearConsole_Click" />
-              </DockPanel>
-              <ListBox x:Name="ConsoleList" Grid.Row="1" Background="#0B0D12" Padding="8,4" BorderThickness="0" ScrollViewer.VerticalScrollBarVisibility="Auto">
-                <ListBox.ItemContainerStyle>
-                  <Style TargetType="ListBoxItem">
-                    <Setter Property="Padding" Value="2,1" />
-                    <Setter Property="Focusable" Value="False" />
-                    <Setter Property="Template">
-                      <Setter.Value>
-                        <ControlTemplate TargetType="ListBoxItem">
-                          <ContentPresenter />
-                        </ControlTemplate>
-                      </Setter.Value>
-                    </Setter>
-                  </Style>
-                </ListBox.ItemContainerStyle>
-                <ListBox.ItemTemplate>
-                  <DataTemplate>
-                    <TextBlock Text="{Binding Display}" Foreground="{Binding Foreground}" FontFamily="Cascadia Mono, Consolas" FontSize="10.5" TextWrapping="Wrap" />
-                  </DataTemplate>
-                </ListBox.ItemTemplate>
-              </ListBox>
+            <Grid Grid.Row="1">
+              <avalonedit:TextEditor x:Name="ScriptEditor"
+                                     Background="#0E1015" Foreground="#DDD8EE"
+                                     FontFamily="Cascadia Mono, Consolas" FontSize="12.5"
+                                     ShowLineNumbers="True"
+                                     Padding="10,8"
+                                     HorizontalScrollBarVisibility="Auto"
+                                     VerticalScrollBarVisibility="Auto"
+                                     WordWrap="False" />
             </Grid>
-          </Border>
+          </Grid>
+
+          <!-- Workspace: Jogo -->
+          <Grid x:Name="PlayWorkspace" Visibility="Collapsed" Background="#05060A">
+            <Grid x:Name="PlayHost" />
+
+            <Border x:Name="PlayIdlePanel" Background="#D90E1015" BorderBrush="#2A2D38" BorderThickness="1"
+                    CornerRadius="14" Padding="28,22" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    MaxWidth="420">
+              <StackPanel>
+                <TextBlock Text="MODO DE EXECUÇÃO" Style="{StaticResource SectionLabel}" HorizontalAlignment="Center" />
+                <TextBlock Text="Teste o jogo sem sair do editor." FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" Margin="0,0,0,6" />
+                <TextBlock Text="A cena atual é recarregada do zero. F5 reinicia e Esc encerra a execução."
+                           FontSize="10.5" Foreground="#8A8E9E" TextWrapping="Wrap" TextAlignment="Center"
+                           Margin="0,0,0,16" />
+                <Button Style="{StaticResource PrimaryButton}" Content="▶  Executar agora" Click="Play_Click"
+                        HorizontalAlignment="Center" />
+              </StackPanel>
+            </Border>
+
+            <Border x:Name="PlayHud" Visibility="Collapsed" VerticalAlignment="Top" HorizontalAlignment="Right"
+                    Margin="16" Background="#D91B1E27" BorderBrush="#333744" BorderThickness="1"
+                    CornerRadius="10" Padding="10,7">
+              <StackPanel Orientation="Horizontal">
+                <Ellipse Width="7" Height="7" Fill="#6EE7B7" Margin="0,0,8,0" VerticalAlignment="Center" />
+                <TextBlock Text="EXECUTANDO" FontSize="9.5" FontWeight="Bold" Foreground="#A7F3D0"
+                           VerticalAlignment="Center" />
+                <TextBlock x:Name="PlayFpsText" Text="" FontSize="10" Foreground="#C9C4DA"
+                           Margin="12,0,0,0" VerticalAlignment="Center" />
+                <Button Style="{StaticResource GhostButton}" Content="↻" FontSize="11" Padding="8,3"
+                        Margin="12,0,0,0" Click="RestartPlay_Click" ToolTip="Reiniciar (F5)" />
+                <Button Style="{StaticResource GhostButton}" Content="■ Parar" FontSize="10.5" Padding="9,3"
+                        Margin="6,0,0,0" Click="Stop_Click" ToolTip="Parar (Esc)" />
+              </StackPanel>
+            </Border>
+
+            <Border VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="16"
+                    Background="#B30B0D12" CornerRadius="7" Padding="9,5" IsHitTestVisible="False">
+              <TextBlock Text="Esc parar · F5 reiniciar · WASD / setas controlam o jogo"
+                         FontSize="10" Foreground="#8D91A1" />
+            </Border>
+          </Grid>
         </Grid>
+
+        <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" Background="#0A0B10" ShowsPreview="False" />
+
+        <!-- Console -->
+        <Border Grid.Row="3" Background="{StaticResource PanelDeep}" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="30" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <DockPanel Margin="12,0">
+              <TextBlock Text="SAÍDA" Style="{StaticResource SectionLabel}" Margin="0" VerticalAlignment="Center" />
+              <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="Limpar" FontSize="10" Padding="8,4" Click="ClearConsole_Click" VerticalAlignment="Center" />
+            </DockPanel>
+            <ListBox x:Name="ConsoleList" Grid.Row="1" Background="#0B0D12" Padding="8,4" BorderThickness="0" ScrollViewer.VerticalScrollBarVisibility="Auto">
+              <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                  <Setter Property="Padding" Value="2,1" />
+                  <Setter Property="Focusable" Value="False" />
+                  <Setter Property="Template">
+                    <Setter.Value>
+                      <ControlTemplate TargetType="ListBoxItem">
+                        <ContentPresenter />
+                      </ControlTemplate>
+                    </Setter.Value>
+                  </Setter>
+                </Style>
+              </ListBox.ItemContainerStyle>
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Display}" Foreground="{Binding Foreground}" FontFamily="Cascadia Mono, Consolas" FontSize="10.5" TextWrapping="Wrap" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Grid>
+        </Border>
       </Grid>
 
       <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="#0A0B10" ShowsPreview="False" />
@@ -375,8 +447,8 @@
 
             <Border Background="#141720" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="10" Padding="12,10">
               <StackPanel>
-                <TextBlock x:Name="InspectorName" Text="Nenhum objeto selecionado" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                <TextBlock x:Name="InspectorType" Text="Selecione um objeto na hierarquia" FontSize="10" Foreground="#8A8E9E" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="InspectorName" Text="Nenhum ator selecionado" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="InspectorType" Text="Selecione um ator na hierarquia" FontSize="10" Foreground="#8A8E9E" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
               </StackPanel>
             </Border>
 
@@ -470,10 +542,10 @@
                   <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                  <TextBlock Text="OBJETO PAI" Style="{StaticResource FieldLabel}" />
+                  <TextBlock Text="ATOR PAI" Style="{StaticResource FieldLabel}" />
                   <Button x:Name="ParentButton" Style="{StaticResource GhostButton}" Padding="8,5" MinHeight="30"
                           HorizontalContentAlignment="Left" Click="ParentButton_Click"
-                          ToolTip="Escolher o objeto pai deste objeto na hierarquia">
+                          ToolTip="Escolher o ator pai deste ator na hierarquia">
                     <TextBlock x:Name="ParentButtonText" Text="— raiz —" FontSize="10.5" TextTrimming="CharacterEllipsis" />
                   </Button>
                 </StackPanel>
@@ -519,6 +591,13 @@
                     <TextBox x:Name="ModelTextureField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" ToolTip="Imagem aplicada como textura de todos os materiais do modelo" />
                   </StackPanel>
                 </Grid>
+                <TextBlock Text="MATERIAL DO MODELO" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+                <DockPanel Margin="0,0,0,4">
+                  <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="Biblioteca…" FontSize="10" Padding="8,5" Click="OpenMaterials_Click" Margin="5,0,0,0" />
+                  <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="Limpar" FontSize="10" Padding="8,5" Click="ClearMaterial_Click" Margin="5,0,0,0" />
+                  <TextBox x:Name="MaterialField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" ToolTip="Arquivo .material.json aplicado ao modelo" />
+                </DockPanel>
+                <TextBlock Text="Modelos com escala de exportação fora do comum são normalizados automaticamente; ajuste a escala do modelo se precisar." FontSize="9" Foreground="#767B8C" TextWrapping="Wrap" LineHeight="13" />
               </StackPanel>
 
               <StackPanel x:Name="CameraPanel" Visibility="Collapsed" Margin="0,4,0,10">
@@ -602,6 +681,71 @@
                 <TextBox x:Name="VolumeIntensityField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
               </StackPanel>
 
+              <Border x:Name="ActorPanel" Visibility="Collapsed" Background="#12141C" BorderBrush="#262A36" BorderThickness="1"
+                      CornerRadius="8" Padding="10,9" Margin="0,4,0,10">
+                <StackPanel>
+                  <TextBlock Text="ATOR E DESEMPENHO" Style="{StaticResource SectionLabel}" Margin="0,0,0,6" />
+                  <CheckBox x:Name="LodEnabledCheck" Content="Ativar LOD por distância" Click="LodEnabled_Click" Margin="0,0,0,8" />
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="8" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock Text="DISTÂNCIA DO LOD" Style="{StaticResource FieldLabel}" />
+                      <TextBox x:Name="LodDistanceField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" ToolTip="Até esta distância o modelo completo é desenhado; depois entra o proxy leve" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                      <TextBlock Text="DISTÂNCIA DE RENDER" Style="{StaticResource FieldLabel}" />
+                      <TextBox x:Name="RenderDistanceField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" ToolTip="Depois desta distância o ator deixa de ser desenhado" />
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock x:Name="ActorStatsText" Text="Atores visíveis: —" FontSize="9.5" Foreground="#7F8496" Margin="0,7,0,0" />
+                </StackPanel>
+              </Border>
+
+              <StackPanel x:Name="ParticlePanel" Visibility="Collapsed" Margin="0,4,0,10">
+                <TextBlock Text="PARTÍCULAS" Style="{StaticResource FieldLabel}" />
+                <Grid Margin="0,0,0,7">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="7" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="QUANTIDADE" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="ParticleCountField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Text="VIDA (S)" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="ParticleLifeField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
+                  </StackPanel>
+                </Grid>
+                <Grid Margin="0,0,0,7">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="7" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="7" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="VELOCIDADE" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="ParticleSpeedField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Text="TAMANHO" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="ParticleSizeField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="4">
+                    <TextBlock Text="COR" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="ParticleColorField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
+                  </StackPanel>
+                </Grid>
+                <CheckBox x:Name="ParticleGravityCheck" Content="Afetar partículas com gravidade" Click="ParticleGravity_Click" />
+              </StackPanel>
+
               <!-- Componentes -->
               <Border Height="1" Background="{StaticResource Line}" Margin="0,6,0,10" />
               <DockPanel Margin="0,0,0,6">
@@ -612,14 +756,14 @@
 
               <!-- Script principal -->
               <Border Height="1" Background="{StaticResource Line}" Margin="0,10,0,10" />
-              <TextBlock Text="SCRIPT DO OBJETO" Style="{StaticResource FieldLabel}" />
+              <TextBlock Text="SCRIPT DO ATOR" Style="{StaticResource FieldLabel}" />
               <Border Background="#141720" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="7" Padding="9,7">
                 <TextBlock x:Name="ScriptPathText" Text="Sem script vinculado" FontSize="10" Foreground="#A9A4BD" TextTrimming="CharacterEllipsis" />
               </Border>
               <Button Style="{StaticResource GhostButton}" Content="Ir para o script" HorizontalAlignment="Left" Padding="9,6" Margin="0,8,0,0" Click="GoToScript_Click" />
-              <Button Style="{StaticResource GhostButton}" Content="Abrir no editor grande" HorizontalAlignment="Left" Padding="9,6" Margin="0,8,0,0" Click="OpenLargeScript_Click" />
+              <Button Style="{StaticResource GhostButton}" Content="Abrir no workspace de script" HorizontalAlignment="Left" Padding="9,6" Margin="0,8,0,0" Click="GoToScript_Click" />
 
-              <Button Content="Remover objeto" Background="#2A1A1E" Foreground="#F0A0A0" Padding="10,8" Margin="0,16,0,0" Click="DeleteObject_Click" />
+              <Button Content="Remover ator" Background="#2A1A1E" Foreground="#F0A0A0" Padding="10,8" Margin="0,16,0,0" Click="DeleteObject_Click" />
             </StackPanel>
 
             <Border Background="#141720" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,18,0,0">
@@ -641,7 +785,7 @@
           <TextBlock x:Name="StatusText" Text="PRONTO" FontSize="9.5" FontWeight="SemiBold" Foreground="#8A8E9E" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-          <TextBlock x:Name="LanguageVersionText" Text="VelvX Language · 0.3.0" FontSize="9.5" Foreground="#5E6372" Margin="0,0,16,0" />
+          <TextBlock x:Name="LanguageVersionText" Text="VelvX Language · 0.4.0" FontSize="9.5" Foreground="#5E6372" Margin="0,0,16,0" />
           <TextBlock x:Name="FpsText" Text="" FontSize="9.5" Foreground="#5E6372" Margin="0,0,16,0" />
           <TextBlock x:Name="StatusLineText" Text="Ln 1, Col 1" FontSize="9.5" Foreground="#5E6372" />
         </StackPanel>
@@ -663,13 +807,13 @@
 
     <Popup x:Name="AddObjectPopup" PlacementTarget="{Binding ElementName=AddObjectButton}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
       <Border Background="#1B1E27" BorderBrush="#333744" BorderThickness="1" CornerRadius="10" Padding="6" Margin="0,6,0,0">
-        <StackPanel x:Name="AddObjectMenu" Width="204" />
+        <StackPanel x:Name="AddObjectMenu" Width="224" />
       </Border>
     </Popup>
 
     <Popup x:Name="AddComponentPopup" PlacementTarget="{Binding ElementName=AddComponentButton}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
       <Border Background="#1B1E27" BorderBrush="#333744" BorderThickness="1" CornerRadius="10" Padding="6" Margin="0,6,0,0">
-        <StackPanel x:Name="AddComponentMenu" Width="224" />
+        <StackPanel x:Name="AddComponentMenu" Width="240" />
       </Border>
     </Popup>
 
