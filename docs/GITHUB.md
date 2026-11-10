@@ -55,11 +55,11 @@ git push
    powershell -ExecutionPolicy Bypass -File .\build.ps1
    ```
 
-   O script lê a versão do `.csproj`, publica a Engine para `win-x64` (self-contained), copia os templates e gera `dist\VelvX-Engine-win-x64.zip`.
+   O script lê a versão do `.csproj`, publica a Engine para `win-x64` (self-contained), copia os templates, gera `dist\VelvX-Engine-win-x64.zip` e o checksum `dist\SHA256.txt`.
 
 2. Abra <https://github.com/NoeXVel/VelvX-Engine/releases> e clique em **Draft a new release**.
 3. Crie a tag `v0.3.0`, título `VelvX Engine 0.3.0 — Bigorna` e use as notas abaixo.
-4. Anexe `dist\VelvX-Engine-win-x64.zip` em **Attach binaries**.
+4. Anexe `dist\VelvX-Engine-win-x64.zip` e `dist\SHA256.txt` em **Attach binaries**.
 5. Publique a release. Quem baixar só precisa extrair e executar `VelvX.Engine.exe` — não é necessário instalar o .NET.
 
 ### Notas sugeridas para a release v0.3.0
