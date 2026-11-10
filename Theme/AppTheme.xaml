@@ -359,6 +359,55 @@
     </Setter>
   </Style>
 
+  <Style TargetType="CheckBox">
+    <Setter Property="Foreground" Value="#CFCADF" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="CheckBox">
+          <StackPanel Orientation="Horizontal" Background="Transparent">
+            <Border x:Name="Box" Width="16" Height="16" CornerRadius="4"
+                    Background="#12141A" BorderBrush="#3A3E4C" BorderThickness="1"
+                    VerticalAlignment="Center">
+              <TextBlock x:Name="Mark" Text="✓" FontSize="10" FontWeight="Bold"
+                         Foreground="#17131F" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Visibility="Collapsed" />
+            </Border>
+            <ContentPresenter Margin="7,0,0,0" VerticalAlignment="Center" />
+          </StackPanel>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Box" Property="Background" Value="{StaticResource Accent}" />
+              <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Accent}" />
+              <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Box" Property="BorderBrush" Value="#7263A0" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="0.45" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="TreeView">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+  </Style>
+
+  <Style TargetType="TreeViewItem">
+    <Setter Property="Foreground" Value="#D8D4E4" />
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="Padding" Value="2,2" />
+    <Setter Property="IsExpanded" Value="False" />
+  </Style>
+
   <!-- Dica -->
   <Style TargetType="ToolTip">
     <Setter Property="Background" Value="#1B1E27" />

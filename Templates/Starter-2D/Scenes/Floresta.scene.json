@@ -1,0 +1,112 @@
+{
+  "name": "Floresta",
+  "mode": "2D",
+  "objects": [
+    {
+      "id": "forest-bg",
+      "name": "Céu",
+      "type": "Rectangle",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "size": [
+        26,
+        15
+      ],
+      "color": "#101D1A"
+    },
+    {
+      "id": "forest-ground",
+      "name": "Chão",
+      "type": "Rectangle",
+      "position": [
+        0,
+        -4.6,
+        0
+      ],
+      "size": [
+        24,
+        0.8
+      ],
+      "color": "#1C2B24"
+    },
+    {
+      "id": "tree-a",
+      "name": "Árvore A",
+      "type": "Ellipse",
+      "position": [
+        -7,
+        1.4,
+        0
+      ],
+      "size": [
+        2.2,
+        3.4
+      ],
+      "color": "#2B4A38"
+    },
+    {
+      "id": "tree-b",
+      "name": "Árvore B",
+      "type": "Ellipse",
+      "position": [
+        7,
+        2.1,
+        0
+      ],
+      "size": [
+        2.8,
+        4.2
+      ],
+      "color": "#244033"
+    },
+    {
+      "id": "firefly-a",
+      "name": "Vaga-lume A",
+      "type": "Sprite",
+      "position": [
+        -2,
+        0.6,
+        0
+      ],
+      "size": [
+        0.7,
+        0.7
+      ],
+      "sprite": {
+        "path": "Assets/Sprites/orb.gif",
+        "frameWidth": 32,
+        "frameHeight": 32,
+        "columns": 1,
+        "rows": 1,
+        "fps": 10,
+        "loop": true
+      }
+    },
+    {
+      "id": "firefly-b",
+      "name": "Vaga-lume B",
+      "type": "Sprite",
+      "position": [
+        3,
+        1.2,
+        0
+      ],
+      "size": [
+        0.7,
+        0.7
+      ],
+      "sprite": {
+        "path": "Assets/Sprites/orb.gif",
+        "frameWidth": 32,
+        "frameHeight": 32,
+        "columns": 1,
+        "rows": 1,
+        "fps": 10,
+        "loop": true
+      }
+    }
+  ]
+}

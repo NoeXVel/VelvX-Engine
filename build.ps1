@@ -11,7 +11,7 @@ $dist = Join-Path $root "dist"
 $output = Join-Path $dist "VelvX-Engine-$Runtime"
 $zip = "$output.zip"
 
-$version = "0.1.0"
+$version = "0.2.0"
 $match = [regex]::Match((Get-Content $project -Raw), "<Version>([^<]+)</Version>")
 if ($match.Success) { $version = $match.Groups[1].Value }
 
@@ -55,18 +55,31 @@ if ((Test-Path $sourceTemplates) -and -not (Test-Path $targetTemplates)) {
 }
 
 $readme = @"
-VelvX Engine $version - Fundacao
-================================
+VelvX Engine $version - Forja
+=============================
 
 1. Extraia esta pasta em qualquer lugar do computador.
 2. Execute VelvX.Engine.exe.
 3. Crie um projeto em Novo projeto (2D ou 3D) e comece a construir.
 
+Novidades da 0.2.0:
+  - setas coloridas para mover os objetos na cena;
+  - camera 3D com WASD (E/Q sobem e descem);
+  - editor de script com cores, ajuda e numeracao;
+  - Configuracoes do Projeto com Inputs personalizados, renderizacao,
+    iluminacao e cenas;
+  - recursos, prefabs, modelos 3D, sprites, GIFs e spritesheets;
+  - componentes, luzes pontuais, Global Volume e Box Volume;
+  - streaming de cenas com Scene("Nome").load()/unload().
+
 Teclas no editor:
   F5 ........ iniciar o jogo
   Esc ....... parar o jogo
   Ctrl+S .... salvar o projeto
-  WASD ...... mover o Player durante o Play
+  Ctrl+, .... abrir Configuracoes do Projeto
+  F ......... focar o objeto selecionado
+  WASD ...... mover a camera 3D no editor
+  Setas ..... mover o Player durante o Play
 
 Seus projetos ficam em Documentos\VelvX Projects.
 Os templates ficam na pasta Templates ao lado deste executavel.

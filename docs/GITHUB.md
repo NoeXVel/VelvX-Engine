@@ -25,7 +25,7 @@ git init
 git branch -M main
 
 git add .
-git commit -m "VelvX Engine 0.1.0 - fundacao, editor e VelvX Language"
+git commit -m "VelvX Engine 0.2.0 - Forja: gizmos, scripts coloridos, inputs, prefabs, streaming e modelos"
 
 git remote add origin https://github.com/NoeXVel/VelvX-Engine.git
 git fetch origin
@@ -55,10 +55,43 @@ git push
    powershell -ExecutionPolicy Bypass -File .\build.ps1
    ```
 
+   O script lê a versão do `.csproj`, publica a Engine para `win-x64` (self-contained), copia os templates e gera `dist\VelvX-Engine-win-x64.zip`.
+
 2. Abra <https://github.com/NoeXVel/VelvX-Engine/releases> e clique em **Draft a new release**.
-3. Crie a tag `v0.1.0`, título `VelvX Engine 0.1.0 — Fundação` e descreva as novidades.
+3. Crie a tag `v0.2.0`, título `VelvX Engine 0.2.0 — Forja` e use as notas abaixo.
 4. Anexe `dist\VelvX-Engine-win-x64.zip` em **Attach binaries**.
 5. Publique a release. Quem baixar só precisa extrair e executar `VelvX.Engine.exe` — não é necessário instalar o .NET.
+
+### Notas sugeridas para a release v0.2.0
+
+```markdown
+## VelvX Engine 0.2.0 — Forja
+
+A primeira build pensada para começar jogos de verdade.
+
+### Editor
+- Setas de transformação (X/Y/Z) com arraste no viewport, snap com Ctrl/Shift e foco com F.
+- Câmera de edição 3D livre: WASD/setas, E sobe, Q desce, Shift acelera e Ctrl aproxima.
+- Painel de script ao lado da Saída, com realce de sintaxe e ajuda da VelvX Language.
+- Project Settings (Ctrl+,) com aba de Entradas para criar ações e teclas próprias.
+- Painel de Recursos ao lado da Saída: cenas, scripts, assets e prefabs.
+- Prefabs por arraste da hierarquia para a pasta `Prefabs` e de volta para a cena.
+- Inspetor com componentes (Script, Rotator, PointLight) e edição de modelos, sprites, luzes e volumes.
+- Hierarquia melhorada, criação de cenas e rodapé com as cenas carregadas.
+
+### Jogos
+- Modelos 3D OBJ/FBX/GLTF/GLB, com texturas e animações por skin/nó.
+- 2D com sprites, GIFs animados e spritesheets.
+- Streaming de cenas com `Scene("Nome").load()/unload()/set_active()/is_loaded()`.
+- Iluminação com ambiente, sol direcional, luzes pontuais, Global Volume e Box Volume.
+- Limite de FPS configurável e modo de renderização para PCs modestos.
+- VelvX Language com inputs personalizados, acesso à cena, componentes e ciclo Main/InGame.
+
+### Requisitos
+- Windows 10/11 64 bits, 4 GB de RAM (8 GB recomendado), GPU com DirectX 11 (GTX 1650 roda com folga).
+
+O zip é portátil: extraia e execute `VelvX.Engine.exe`. Projetos de exemplo são criados pelo launcher em **Novo projeto**.
+```
 
 ## 5. Alternativa: GitHub Desktop
 

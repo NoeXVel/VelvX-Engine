@@ -24,7 +24,13 @@ public static class HeadlessRunner
                 ? SceneDocument.Load(scenePath)
                 : CreateDefaultScene(mode);
 
-            var session = new GameSession(scene, source, new InputState());
+            var project = FindProject(scriptPath, scenePath);
+            var inputs = project?.Info.Inputs ?? InputMap.CreateDefault();
+            var sceneDirectory = scenePath is not null
+                ? Path.GetDirectoryName(Path.GetFullPath(scenePath))
+                : project?.FolderPath;
+
+            var session = new GameSession(scene, source, new InputState(inputs), project, sceneDirectory);
             session.Output += (message, level) =>
                 lines.Add(level == ScriptLogLevel.Info ? message : $"[{level.ToString().ToLowerInvariant()}] {message}");
 
@@ -48,6 +54,32 @@ public static class HeadlessRunner
             errors.Add(exception.Message);
             return new HeadlessResult(false, lines, errors);
         }
+    }
+
+    private static GameProject? FindProject(string scriptPath, string? scenePath)
+    {
+        foreach (var start in new[] { scenePath, scriptPath })
+        {
+            if (string.IsNullOrWhiteSpace(start) || !File.Exists(start)) continue;
+            var directory = new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(start))!);
+            for (var depth = 0; depth < 4 && directory is not null; depth++, directory = directory.Parent)
+            {
+                var projectFile = Directory.EnumerateFiles(directory.FullName, "*" + GameProject.FileExtension)
+                    .FirstOrDefault();
+                if (projectFile is not null)
+                {
+                    try
+                    {
+                        return GameProject.Open(projectFile);
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     public static SceneDocument CreateDefaultScene(string mode)

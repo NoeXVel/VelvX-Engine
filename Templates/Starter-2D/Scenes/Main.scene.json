@@ -6,43 +6,131 @@
       "id": "background",
       "name": "Fundo",
       "type": "Rectangle",
-      "position": [0, 0, 0],
-      "size": [22, 13],
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "size": [
+        22,
+        13
+      ],
       "color": "#121722"
     },
     {
       "id": "ground",
       "name": "Chão",
       "type": "Rectangle",
-      "position": [0, -4.4, 0],
-      "size": [18, 0.6],
+      "position": [
+        0,
+        -4.4,
+        0
+      ],
+      "size": [
+        18,
+        0.6
+      ],
       "color": "#242833"
     },
     {
       "id": "platform",
       "name": "Plataforma",
       "type": "Rectangle",
-      "position": [-4, 0.8, 0],
-      "size": [4, 0.5],
+      "position": [
+        -4,
+        -1.2,
+        0
+      ],
+      "size": [
+        4,
+        0.5
+      ],
       "color": "#2E3242"
     },
     {
       "id": "orb",
       "name": "Orbe",
-      "type": "Ellipse",
-      "position": [4, 1.6, 0],
-      "size": [1.2, 1.2],
-      "color": "#8B6CFF"
+      "type": "Sprite",
+      "position": [
+        4,
+        1.6,
+        0
+      ],
+      "size": [
+        1.2,
+        1.2
+      ],
+      "sprite": {
+        "path": "Assets/Sprites/orb.gif",
+        "frameWidth": 32,
+        "frameHeight": 32,
+        "columns": 1,
+        "rows": 1,
+        "fps": 8,
+        "loop": true
+      }
+    },
+    {
+      "id": "star",
+      "name": "Estrela",
+      "type": "Sprite",
+      "position": [
+        -4,
+        0.2,
+        0
+      ],
+      "size": [
+        0.9,
+        0.9
+      ],
+      "sprite": {
+        "path": "Assets/Sprites/star.png",
+        "frameWidth": 32,
+        "frameHeight": 32,
+        "columns": 1,
+        "rows": 1,
+        "fps": 1,
+        "loop": true
+      }
+    },
+    {
+      "id": "hero-deco",
+      "name": "Herói (sprite)",
+      "type": "Sprite",
+      "position": [
+        5.5,
+        -3.4,
+        0
+      ],
+      "size": [
+        1.6,
+        1.6
+      ],
+      "sprite": {
+        "path": "Assets/Sprites/hero_sheet.png",
+        "frameWidth": 32,
+        "frameHeight": 32,
+        "columns": 4,
+        "rows": 1,
+        "fps": 8,
+        "loop": true
+      }
     },
     {
       "id": "player",
       "name": "Player2D",
       "type": "CharacterBody2D",
-      "position": [0, -2.4, 0],
-      "size": [1, 1],
+      "position": [
+        -1.5,
+        -2.4,
+        0
+      ],
+      "size": [
+        1,
+        1
+      ],
       "color": "#A98BFF",
       "script": "Scripts/Main.velv"
     }
   ]
 }
-

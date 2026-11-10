@@ -1,0 +1,7 @@
+## Script de componente — adicione em Inspetor > Componentes > + > Script.
+## Ele roda no objeto dono: use "this" e game.delta_time.
+
+func InGame()
+{
+    this.rotation.z = this.rotation.z + game.delta_time * 10;
+}

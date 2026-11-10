@@ -82,7 +82,7 @@
             </Border>
             <StackPanel VerticalAlignment="Center" Margin="9,0,0,0">
               <TextBlock Text="VelvX Engine" FontSize="11.5" FontWeight="SemiBold" />
-              <TextBlock x:Name="VersionText" Text="v0.1.0" FontSize="9.5" Foreground="#6B6F7E" Margin="0,1,0,0" />
+              <TextBlock x:Name="VersionText" Text="v0.2.0" FontSize="9.5" Foreground="#6B6F7E" Margin="0,1,0,0" />
             </StackPanel>
           </StackPanel>
         </StackPanel>

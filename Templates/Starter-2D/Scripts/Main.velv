@@ -5,11 +5,20 @@
 func Main()
 {
     console.show("VelvX 2D pronta. Use WASD ou as setas para mover o Player2D.");
+    console.show("Pressione E para carregar a Floresta por streaming.");
 }
 
 func InGame()
 {
     ## Ordem dos argumentos: positivo X, negativo X, positivo Y, negativo Y.
-    var direcao = game.get_input_vectors("direita", "esquerda", "cima", "baixo");
+    ## Os nomes abaixo são ações do projeto — edite em Projeto > Configurações > Entradas.
+    var direcao = game.get_input_vectors("mover_direita", "mover_esquerda", "mover_cima", "mover_baixo");
     this.CharacterBody2D.velocity = new.Vector2(direcao.x * 5, direcao.y * 5);
+
+    ## Streaming de nível: carrega a Floresta uma única vez.
+    if game.get_input("interagir") and not Scene("Floresta").is_loaded()
+    {
+        Scene("Floresta").load();
+        console.show("Floresta carregada por streaming.");
+    }
 }

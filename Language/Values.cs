@@ -14,8 +14,14 @@ public interface IScriptHost
     double DeltaTime { get; }
     ScriptObject GetThis();
     ScriptObject GetSceneRoot(string sceneName);
+    ScriptObject SceneManager { get; }
     ScriptObject GetAssetObject(string path);
     VelvVector2 GetInputVectors(IReadOnlyList<string> actions);
+    bool IsActionDown(string action);
+    bool LoadScene(string nameOrPath);
+    bool UnloadScene(string nameOrPath);
+    bool SetActiveScene(string nameOrPath);
+    bool IsSceneLoaded(string nameOrPath);
     void Show(string message, ScriptLogLevel level);
 }
 

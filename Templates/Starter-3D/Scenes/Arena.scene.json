@@ -1,0 +1,204 @@
+{
+  "name": "Arena",
+  "mode": "3D",
+  "environment": {
+    "ambient": "#596080",
+    "ambientIntensity": 0.8,
+    "sunColor": "#FFE0C2",
+    "sunIntensity": 1.5,
+    "sunYaw": -35.0,
+    "sunPitch": -55.0,
+    "backgroundTop": "#090A12",
+    "backgroundBottom": "#26152B",
+    "fogColor": "#120F1E",
+    "fogDensity": 0.0
+  },
+  "objects": [
+    {
+      "position": [
+        0,
+        -0.1,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        26,
+        0.2,
+        26
+      ],
+      "id": "arena-ground",
+      "name": "Chão da Arena",
+      "type": "Box",
+      "color": "#2A2230"
+    },
+    {
+      "position": [
+        0,
+        0,
+        -13
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        26,
+        3,
+        1
+      ],
+      "id": "arena-wall-n",
+      "name": "Muro Norte",
+      "type": "Box",
+      "color": "#433449"
+    },
+    {
+      "position": [
+        0,
+        0,
+        13
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        26,
+        3,
+        1
+      ],
+      "id": "arena-wall-s",
+      "name": "Muro Sul",
+      "type": "Box",
+      "color": "#433449"
+    },
+    {
+      "position": [
+        13,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        3,
+        26
+      ],
+      "id": "arena-wall-e",
+      "name": "Muro Leste",
+      "type": "Box",
+      "color": "#433449"
+    },
+    {
+      "position": [
+        -13,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        3,
+        26
+      ],
+      "id": "arena-wall-w",
+      "name": "Muro Oeste",
+      "type": "Box",
+      "color": "#433449"
+    },
+    {
+      "position": [
+        0,
+        1.2,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        2.2,
+        2.2,
+        2.2
+      ],
+      "id": "arena-orb",
+      "name": "Núcleo",
+      "type": "Sphere",
+      "color": "#FFB86C",
+      "components": [
+        {
+          "type": "Rotator",
+          "axis": "Y",
+          "speed": 60,
+          "enabled": true
+        },
+        {
+          "type": "PointLight",
+          "color": "#FFB86C",
+          "amount": 2.0,
+          "range": 14,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "position": [
+        0,
+        5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "id": "arena-light",
+      "name": "Luz da Arena",
+      "type": "PointLight",
+      "color": "#FFD6A0",
+      "intensity": 2.2,
+      "range": 20
+    },
+    {
+      "position": [
+        0,
+        5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "id": "arena-volume",
+      "name": "Global Volume da Arena",
+      "type": "GlobalVolume",
+      "color": "#B05A2A",
+      "intensity": 0.8
+    }
+  ]
+}

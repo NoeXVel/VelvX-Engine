@@ -1,45 +1,45 @@
+using System.IO;
 using VelvX.Engine.Core;
 using VelvX.Engine.Language;
 
 namespace VelvX.Engine.Runtime;
 
 /// <summary>
-/// Liga a cena da Engine ao interpretador da VelvX. É usada pelo modo Play do
-/// editor e pelo executor headless, garantindo o mesmo comportamento no jogo.
+/// Liga as cenas da Engine ao interpretador da VelvX. Dá suporte a múltiplas
+/// cenas carregadas (streaming), componentes nativos e scripts por objeto.
 /// </summary>
 public sealed class GameSession : IScriptHost
 {
-    private readonly Dictionary<string, ScriptObject> _objectsByKey = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<Binding> _bindings = [];
+    private readonly Dictionary<string, SceneInstance> _scenes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<ComponentScript> _componentScripts = [];
     private readonly ScriptObject _sceneRoot;
     private readonly ScriptObject _this;
     private readonly ScriptObject? _playerComponent;
     private readonly SceneObject? _playerSceneObject;
     private readonly string _scriptSource;
+    private readonly string? _sceneDirectory;
     private Interpreter? _interpreter;
     private GameProject? _project;
+    private ScriptObject _sceneManager;
+    private string? _activeSceneKey;
     private bool _started;
     private double _deltaTime = 1.0 / 60.0;
 
-    public GameSession(SceneDocument scene, string scriptSource, InputState input, GameProject? project = null)
+    public GameSession(
+        SceneDocument scene,
+        string scriptSource,
+        InputState input,
+        GameProject? project = null,
+        string? sceneDirectory = null)
     {
-        Scene = scene;
         Input = input;
         _scriptSource = scriptSource;
         _project = project;
+        _sceneDirectory = sceneDirectory;
 
-        _sceneRoot = new ScriptObject(scene.Name, "Scene");
-        var mode3D = scene.Is3D;
-
-        foreach (var item in scene.Objects)
-        {
-            var scriptObject = CreateScriptObject(item, mode3D);
-            _objectsByKey[item.Id] = scriptObject;
-            _objectsByKey[item.Name] = scriptObject;
-            _sceneRoot.Set(item.Id, scriptObject);
-            _sceneRoot.Set(item.Name, scriptObject);
-            _bindings.Add(new Binding(item, scriptObject));
-        }
+        var instance = AddScene(scene, null);
+        _sceneRoot = instance.Root;
+        _activeSceneKey = instance.Key;
 
         _playerSceneObject = scene.Objects.FirstOrDefault(item =>
                                 !string.IsNullOrWhiteSpace(item.Script) &&
@@ -50,31 +50,47 @@ public sealed class GameSession : IScriptHost
 
         if (_playerSceneObject is not null)
         {
-            _this = _objectsByKey[_playerSceneObject.Id];
-            var componentName = mode3D ? "CharacterBody3D" : "CharacterBody2D";
+            _this = instance.Objects[_playerSceneObject.Id];
+            var componentName = scene.Is3D ? "CharacterBody3D" : "CharacterBody2D";
             if (_this.TryGet(componentName, out var component) && component is ScriptObject componentObject)
                 _playerComponent = componentObject;
         }
         else
         {
-            _this = new ScriptObject("Player", mode3D ? "CharacterBody3D" : "CharacterBody2D");
-            _this.Set("position", mode3D ? new VelvVector3(0, 0, 0) : new VelvVector2(0, 0));
-            _this.Set("velocity", mode3D ? new VelvVector3(0, 0, 0) : new VelvVector2(0, 0));
+            _this = new ScriptObject("Player", scene.Is3D ? "CharacterBody3D" : "CharacterBody2D");
+            _this.Set("position", scene.Is3D ? new VelvVector3(0, 0, 0) : new VelvVector2(0, 0));
+            _this.Set("velocity", scene.Is3D ? new VelvVector3(0, 0, 0) : new VelvVector2(0, 0));
         }
+
+        _sceneManager = CreateSceneManager();
     }
 
     public event Action<string, ScriptLogLevel>? Output;
-    public event Action<SceneObject>? SceneObjectChanged;
+    public event Action<string, SceneObject>? SceneObjectChanged;
+    public event Action<string, SceneDocument>? SceneLoaded;
+    public event Action<string>? SceneUnloaded;
+    public event Action<string, SceneDocument?>? ActiveSceneChanged;
     public event Action? Started;
     public event Action? Stopped;
 
-    public SceneDocument Scene { get; }
     public InputState Input { get; }
+    public ScriptObject SceneManager => _sceneManager;
     public ScriptObject This => _this;
-    public ScriptObject SceneRoot => _sceneRoot;
+    public ScriptObject SceneRoot =>
+        _activeSceneKey is not null && _scenes.TryGetValue(_activeSceneKey, out var scene) ? scene.Root : _sceneRoot;
     public bool IsStarted => _started;
     public double DeltaTime => _deltaTime;
     public SceneObject? PlayerSceneObject => _playerSceneObject;
+    public string? ActiveSceneName =>
+        _activeSceneKey is not null && _scenes.TryGetValue(_activeSceneKey, out var scene)
+            ? scene.Document.Name
+            : null;
+    public SceneDocument? ActiveScene =>
+        _activeSceneKey is not null && _scenes.TryGetValue(_activeSceneKey, out var scene)
+            ? scene.Document
+            : null;
+    public IReadOnlyCollection<string> LoadedSceneNames =>
+        _scenes.Values.Select(scene => scene.Document.Name).ToList();
 
     public void Start()
     {
@@ -84,6 +100,8 @@ public sealed class GameSession : IScriptHost
         _interpreter.Load(Parser.Parse(_scriptSource));
         _interpreter.SetDeltaTime(_deltaTime);
         _interpreter.RunMain();
+
+        StartComponentScripts();
         _started = true;
         Started?.Invoke();
     }
@@ -94,45 +112,297 @@ public sealed class GameSession : IScriptHost
 
         _deltaTime = Math.Clamp(deltaTime, 0.0, 0.1);
         _interpreter.SetDeltaTime(_deltaTime);
+        foreach (var component in _componentScripts)
+            component.Interpreter.SetDeltaTime(_deltaTime);
 
-        var before = SnapshotPositions();
+        var before = SnapshotTransforms();
         _interpreter.RunInGame();
-        ApplyMovement(before);
+        RunComponentScripts();
+        ApplyTransforms(before);
+        ApplyNativeComponents();
+        UpdateSceneManager();
     }
 
     public void Stop()
     {
         if (!_started) return;
         _started = false;
+        _componentScripts.Clear();
         Stopped?.Invoke();
     }
 
     public ScriptObject GetThis() => _this;
 
-    public ScriptObject GetSceneRoot(string sceneName) => _sceneRoot;
+    public ScriptObject GetSceneRoot(string sceneName)
+    {
+        var scene = FindScene(sceneName);
+        if (scene is not null) return scene.Root;
+
+        var empty = new ScriptObject(sceneName, "Scene");
+        empty.Set("id", sceneName);
+        return empty;
+    }
 
     public ScriptObject GetAssetObject(string path)
     {
         var clean = (path ?? "").Replace('\\', '/').Trim();
         var last = clean.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? clean;
 
-        if (_objectsByKey.TryGetValue(clean, out var exact)) return exact;
-        if (_objectsByKey.TryGetValue(last, out var byName)) return byName;
+        var active = ActiveScene;
+        if (active is not null &&
+            (active.Objects.Any(item => string.Equals(item.Id, clean, StringComparison.OrdinalIgnoreCase)) ||
+             active.Objects.Any(item => string.Equals(item.Name, last, StringComparison.OrdinalIgnoreCase))))
+        {
+            return FindObjectInScene(active.Name, clean) ?? FindObjectInScene(active.Name, last) ?? CreateAssetPlaceholder(last);
+        }
 
-        var placeholder = new ScriptObject(last, "Object");
-        placeholder.Set("position", Scene.Is3D ? new VelvVector3(0, 0, 0) : new VelvVector2(0, 0));
-        placeholder.Set("visible", true);
-        return placeholder;
+        foreach (var scene in _scenes.Values)
+        {
+            var found = FindObjectInScene(scene.Document.Name, clean) ?? FindObjectInScene(scene.Document.Name, last);
+            if (found is not null) return found;
+        }
+
+        return CreateAssetPlaceholder(last);
     }
 
     public VelvVector2 GetInputVectors(IReadOnlyList<string> actions) => Input.GetInputVectors(actions);
 
+    public bool IsActionDown(string action) => Input.IsActionDown(action);
+
     public void Show(string message, ScriptLogLevel level) => Output?.Invoke(message, level);
+
+    /// <summary>Carrega uma cena do projeto pelo nome ou caminho. Retorna false se não encontrar.</summary>
+    bool IScriptHost.LoadScene(string nameOrPath) => LoadScene(nameOrPath, false);
+
+    public bool LoadScene(string nameOrPath, bool makeActive = false)
+    {
+        var existing = FindScene(nameOrPath);
+        if (existing is not null)
+        {
+            if (makeActive) SetActiveScene(existing.Key);
+            return true;
+        }
+
+        var path = ResolveScenePath(nameOrPath);
+        if (path is null || !File.Exists(path))
+        {
+            Output?.Invoke($"Cena '{nameOrPath}' não encontrada no projeto.", ScriptLogLevel.Warning);
+            return false;
+        }
+
+        try
+        {
+            var document = SceneDocument.Load(path);
+            var entry = FindSceneEntry(nameOrPath) ?? FindSceneEntry(document.Name);
+            if (entry is not null && !string.IsNullOrWhiteSpace(entry.Name))
+                document.Name = entry.Name;
+            else if (string.IsNullOrWhiteSpace(document.Name))
+                document.Name = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(path));
+
+            if (document.Mode is not ("2D" or "3D"))
+                document.Mode = _project?.Info.Mode ?? "3D";
+
+            var instance = AddScene(document, path);
+            if (makeActive) SetActiveScene(instance.Key);
+            Output?.Invoke($"Cena '{document.Name}' carregada.", ScriptLogLevel.Info);
+            SceneLoaded?.Invoke(instance.Key, document);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Output?.Invoke($"Falha ao carregar a cena '{nameOrPath}': {exception.Message}", ScriptLogLevel.Error);
+            return false;
+        }
+    }
+
+    public bool UnloadScene(string nameOrPath)
+    {
+        var scene = FindScene(nameOrPath);
+        if (scene is null) return false;
+
+        if (string.Equals(scene.Key, _activeSceneKey, StringComparison.OrdinalIgnoreCase))
+        {
+            var next = _scenes.Values.FirstOrDefault(item => !ReferenceEquals(item, scene));
+            _activeSceneKey = next?.Key;
+        }
+
+        _componentScripts.RemoveAll(component => ReferenceEquals(component.Scene, scene));
+        _scenes.Remove(scene.Key);
+        Output?.Invoke($"Cena '{scene.Document.Name}' descarregada.", ScriptLogLevel.Info);
+        SceneUnloaded?.Invoke(scene.Key);
+        ActiveSceneChanged?.Invoke(ActiveSceneName ?? "", ActiveScene);
+        return true;
+    }
+
+    public bool SetActiveScene(string nameOrPath)
+    {
+        var scene = FindScene(nameOrPath);
+        if (scene is null)
+        {
+            if (!LoadScene(nameOrPath, makeActive: true)) return false;
+            return true;
+        }
+
+        if (string.Equals(scene.Key, _activeSceneKey, StringComparison.OrdinalIgnoreCase)) return true;
+        _activeSceneKey = scene.Key;
+        ActiveSceneChanged?.Invoke(scene.Key, scene.Document);
+        return true;
+    }
+
+    public bool IsSceneLoaded(string nameOrPath) => FindScene(nameOrPath) is not null;
+
+    private SceneInstance AddScene(SceneDocument document, string? path)
+    {
+        if (string.IsNullOrWhiteSpace(document.Name))
+            document.Name = path is null
+                ? "Main"
+                : Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(path));
+
+        var key = document.Name;
+        var suffix = 2;
+        while (_scenes.ContainsKey(key)) key = $"{document.Name} {suffix++}";
+        document.Name = key;
+
+        var root = new ScriptObject(document.Name, "Scene");
+        var objects = new Dictionary<string, ScriptObject>(StringComparer.OrdinalIgnoreCase);
+        var bindings = new List<Binding>();
+        var mode3D = document.Is3D;
+
+        foreach (var item in document.Objects)
+        {
+            item.EnsureDefaults();
+            if (!item.Visible) continue;
+
+            var scriptObject = CreateScriptObject(item, mode3D);
+            objects[item.Id] = scriptObject;
+            objects[item.Name] = scriptObject;
+            root.Set(item.Id, scriptObject);
+            root.Set(item.Name, scriptObject);
+            bindings.Add(new Binding(item, scriptObject));
+        }
+
+        var instance = new SceneInstance(key, path, document, root, bindings, objects);
+        _scenes[key] = instance;
+        return instance;
+    }
+
+    private SceneInstance? FindScene(string nameOrPath)
+    {
+        if (string.IsNullOrWhiteSpace(nameOrPath)) return null;
+        var clean = nameOrPath.Replace('\\', '/').Trim();
+
+        if (_scenes.TryGetValue(clean, out var direct)) return direct;
+        if (_scenes.TryGetValue(Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(clean)), out var byFile)) return byFile;
+
+        var entry = FindSceneEntry(clean);
+        if (entry is not null)
+        {
+            if (_scenes.TryGetValue(entry.Name, out var byEntry)) return byEntry;
+            if (_scenes.TryGetValue(Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(entry.Path)), out var byEntryFile))
+                return byEntryFile;
+        }
+
+        return _scenes.Values.FirstOrDefault(scene =>
+            string.Equals(scene.Document.Name, clean, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(scene.Path?.Replace('\\', '/'), clean, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private SceneEntry? FindSceneEntry(string nameOrPath)
+    {
+        if (_project is null) return null;
+        return _project.FindScene(nameOrPath) ?? _project.Info.Scenes.FirstOrDefault(scene =>
+            string.Equals(Path.GetFileNameWithoutExtension(scene.Path), nameOrPath, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string? ResolveScenePath(string nameOrPath)
+    {
+        if (Path.IsPathRooted(nameOrPath) && File.Exists(nameOrPath)) return nameOrPath;
+
+        var entry = FindSceneEntry(nameOrPath);
+        if (entry is not null && _project is not null)
+            return _project.Resolve(entry.Path, "Scenes/Main.scene.json");
+
+        var clean = nameOrPath.Replace('\\', '/');
+        if (clean.EndsWith(".scene.json", StringComparison.OrdinalIgnoreCase) ||
+            clean.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_project is not null && File.Exists(_project.Resolve(clean, clean))) return _project.Resolve(clean, clean);
+            if (_sceneDirectory is not null && File.Exists(Path.Combine(_sceneDirectory, clean)))
+                return Path.Combine(_sceneDirectory, clean);
+        }
+
+        var fileName = clean.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+            ? clean
+            : clean + ".scene.json";
+
+        var candidates = new List<string>();
+        if (_project is not null)
+        {
+            candidates.Add(_project.Resolve("Scenes/" + fileName, fileName));
+            candidates.Add(_project.Resolve(fileName, fileName));
+        }
+        if (_sceneDirectory is not null)
+        {
+            candidates.Add(Path.Combine(_sceneDirectory, fileName));
+            candidates.Add(Path.Combine(_sceneDirectory, "Scenes", fileName));
+            var parent = Path.GetDirectoryName(_sceneDirectory);
+            if (parent is not null) candidates.Add(Path.Combine(parent, "Scenes", fileName));
+        }
+
+        return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private ScriptObject? FindObjectInScene(string sceneName, string idOrName)
+    {
+        var scene = FindScene(sceneName);
+        if (scene is null) return null;
+        return scene.Objects.TryGetValue(idOrName, out var found) ? found : null;
+    }
+
+    private ScriptObject CreateAssetPlaceholder(string name)
+    {
+        var placeholder = new ScriptObject(name, "Object");
+        placeholder.Set("position", ActiveScene?.Is3D ?? true ? new VelvVector3(0, 0, 0) : new VelvVector2(0, 0));
+        placeholder.Set("visible", true);
+        return placeholder;
+    }
+
+    private ScriptObject CreateSceneManager()
+    {
+        var manager = new ScriptObject("Scenes", "SceneManager");
+        manager.Set("load", new NativeFunction("load", arguments =>
+            arguments.Count > 0 && LoadScene(ToText(arguments[0]))));
+        manager.Set("unload", new NativeFunction("unload", arguments =>
+            arguments.Count > 0 && UnloadScene(ToText(arguments[0]))));
+        manager.Set("set_active", new NativeFunction("set_active", arguments =>
+            arguments.Count > 0 && SetActiveScene(ToText(arguments[0]))));
+        manager.Set("is_loaded", new NativeFunction("is_loaded", arguments =>
+            arguments.Count > 0 && IsSceneLoaded(ToText(arguments[0]))));
+        manager.Set("current", ActiveSceneName ?? "");
+        manager.Set("loaded", new NativeFunction("loaded", _ => string.Join(", ", LoadedSceneNames)));
+        return manager;
+    }
+
+    private ScriptObject CreateSceneWrapper(string name)
+    {
+        var scene = FindScene(name);
+        var wrapper = new ScriptObject(scene?.Document.Name ?? name, "Scene");
+        wrapper.Set("name", scene?.Document.Name ?? name);
+        wrapper.Set("object", scene?.Root ?? GetSceneRoot(name));
+        wrapper.Set("loaded", scene is not null);
+        wrapper.Set("load", new NativeFunction("load", _ => LoadScene(name)));
+        wrapper.Set("unload", new NativeFunction("unload", _ => UnloadScene(name)));
+        wrapper.Set("set_active", new NativeFunction("set_active", _ => SetActiveScene(name)));
+        wrapper.Set("is_loaded", new NativeFunction("is_loaded", _ => IsSceneLoaded(name)));
+        return wrapper;
+    }
 
     private ScriptObject CreateScriptObject(SceneObject item, bool mode3D)
     {
         var scriptObject = new ScriptObject(item.Name, item.Type);
         scriptObject.Set("id", item.Id);
+        scriptObject.Set("visible", item.Visible);
+        scriptObject.Set("tag", item.Tag ?? "");
 
         object position = mode3D
             ? new VelvVector3(item.X, item.Y, item.Z)
@@ -151,7 +421,6 @@ public sealed class GameSession : IScriptHost
             item.Scale.Length > 0 ? item.Scale[0] : 1,
             item.Scale.Length > 1 ? item.Scale[1] : 1,
             item.Scale.Length > 2 ? item.Scale[2] : 1));
-        scriptObject.Set("visible", true);
 
         if (item.Type is "CharacterBody3D" or "CharacterBody2D")
         {
@@ -165,91 +434,262 @@ public sealed class GameSession : IScriptHost
         return scriptObject;
     }
 
-    private Dictionary<ScriptObject, (double X, double Y, double Z)> SnapshotPositions()
+    private void StartComponentScripts()
     {
-        var snapshot = new Dictionary<ScriptObject, (double X, double Y, double Z)>();
-        foreach (var binding in _bindings)
-            snapshot[binding.Script] = ReadPosition(binding.Script);
+        foreach (var scene in _scenes.Values)
+        {
+            foreach (var item in scene.Document.Objects)
+            {
+                var scripts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(item.Script) &&
+                    !string.Equals(item.Script, _project?.Info.EntryScript, StringComparison.OrdinalIgnoreCase))
+                    scripts.Add(item.Script);
+
+                foreach (var component in item.Components)
+                {
+                    if (!component.Enabled || !string.Equals(component.Type, "Script", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (!string.IsNullOrWhiteSpace(component.Script) &&
+                        !scripts.Contains(component.Script, StringComparer.OrdinalIgnoreCase))
+                        scripts.Add(component.Script);
+                }
+
+                foreach (var scriptPath in scripts)
+                    TryStartComponentScript(scene, item, scriptPath);
+            }
+        }
+    }
+
+    private void TryStartComponentScript(SceneInstance scene, SceneObject item, string scriptPath)
+    {
+        if (!scene.Objects.TryGetValue(item.Id, out var scriptObject)) return;
+
+        var resolved = _project?.ResolveAsset(scriptPath) ?? scriptPath;
+        if (!File.Exists(resolved))
+        {
+            Output?.Invoke($"Script '{scriptPath}' de '{item.Name}' não encontrado.", ScriptLogLevel.Warning);
+            return;
+        }
+
+        try
+        {
+            var host = new ComponentHost(this, scriptObject, item.Name, Path.GetFileName(scriptPath));
+            var interpreter = new Interpreter(host);
+            interpreter.Load(Parser.Parse(File.ReadAllText(resolved)));
+            interpreter.SetDeltaTime(_deltaTime);
+            if (interpreter.HasFunction("Main")) interpreter.RunMain();
+            _componentScripts.Add(new ComponentScript(scene, item, interpreter, scriptPath));
+            Output?.Invoke($"Componente de script '{Path.GetFileName(scriptPath)}' iniciado em '{item.Name}'.", ScriptLogLevel.Info);
+        }
+        catch (Exception exception)
+        {
+            var message = exception is VelvXException velvx ? velvx.FriendlyMessage : exception.Message;
+            Output?.Invoke($"Erro no script '{Path.GetFileName(scriptPath)}' de '{item.Name}': {message}", ScriptLogLevel.Error);
+        }
+    }
+
+    private void RunComponentScripts()
+    {
+        for (var index = _componentScripts.Count - 1; index >= 0; index--)
+        {
+            var component = _componentScripts[index];
+            try
+            {
+                component.Interpreter.RunInGame();
+            }
+            catch (Exception exception)
+            {
+                var message = exception is VelvXException velvx ? velvx.FriendlyMessage : exception.Message;
+                Output?.Invoke($"Erro em '{Path.GetFileName(component.ScriptPath)}' ({component.Item.Name}): {message}",
+                    ScriptLogLevel.Error);
+                _componentScripts.RemoveAt(index);
+            }
+        }
+    }
+
+    private Dictionary<ScriptObject, TransformSnapshot> SnapshotTransforms()
+    {
+        var snapshot = new Dictionary<ScriptObject, TransformSnapshot>();
+        foreach (var scene in _scenes.Values)
+        {
+            foreach (var binding in scene.Bindings)
+                snapshot[binding.Script] = ReadTransform(binding.Script);
+        }
         return snapshot;
     }
 
-    private void ApplyMovement(Dictionary<ScriptObject, (double X, double Y, double Z)> before)
+    private void ApplyTransforms(Dictionary<ScriptObject, TransformSnapshot> before)
     {
-        foreach (var binding in _bindings)
+        foreach (var scene in _scenes.Values)
         {
-            var sceneObject = binding.Scene;
-            var scriptObject = binding.Script;
-            var current = ReadPosition(scriptObject);
-            var previous = before.TryGetValue(scriptObject, out var value) ? value : current;
-            var changed = !NearlyEqual(current, previous);
-
-            if (!changed && ReferenceEquals(sceneObject, _playerSceneObject))
+            foreach (var binding in scene.Bindings)
             {
-                current = IntegrateVelocity(scriptObject, current);
-                WritePosition(scriptObject, current);
-            }
+                var sceneObject = binding.Scene;
+                var scriptObject = binding.Script;
+                var current = ReadTransform(scriptObject);
+                var previous = before.TryGetValue(scriptObject, out var value) ? value : current;
+                var changed = !NearlyEqual(current, previous);
 
-            var newPosition = new[] { current.X, current.Y, current.Z };
-            if (!NearlyEqual(newPosition, sceneObject.Position))
-            {
-                sceneObject.Position = newPosition;
-                SceneObjectChanged?.Invoke(sceneObject);
+                if (!changed)
+                {
+                    current = IntegrateVelocity(scriptObject, current);
+                    WritePosition(scriptObject, current);
+                }
+
+                var newPosition = new[] { current.X, current.Y, current.Z };
+                var positionChanged = !NearlyEqual(newPosition, sceneObject.Position);
+                if (positionChanged)
+                {
+                    sceneObject.Position = newPosition;
+                    SceneObjectChanged?.Invoke(scene.Key, sceneObject);
+                }
+
+                var newRotation = new[] { current.RotationX, current.RotationY, current.RotationZ };
+                if (!NearlyEqual(newRotation, sceneObject.Rotation))
+                {
+                    sceneObject.Rotation = newRotation;
+                    SceneObjectChanged?.Invoke(scene.Key, sceneObject);
+                }
+
+                if (scriptObject.TryGet(sceneObject.Type, out var component) && component is ScriptObject body &&
+                    body.TryGet("position", out _))
+                    body.Set("position", scriptObject.Properties["position"]);
             }
         }
-
-        if (_playerComponent is not null && _playerSceneObject is not null)
-            _playerComponent.Set("position", _objectsByKey[_playerSceneObject.Id].Properties["position"]);
     }
 
-    private (double X, double Y, double Z) IntegrateVelocity(ScriptObject player, (double X, double Y, double Z) position)
+    private void ApplyNativeComponents()
     {
-        if (_playerComponent is null || !_playerComponent.TryGet("velocity", out var velocity)) return position;
+        foreach (var scene in _scenes.Values)
+        {
+            foreach (var item in scene.Document.Objects)
+            {
+                var changed = false;
+                foreach (var component in item.Components)
+                {
+                    if (!component.Enabled) continue;
+
+                    if (string.Equals(component.Type, "Rotator", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var axis = (component.Axis ?? "Y").Trim().ToUpperInvariant();
+                        var amount = (component.Speed == 0 ? 45 : component.Speed) * _deltaTime;
+                        var index = axis switch { "X" => 0, "Z" => 2, _ => 1 };
+                        item.Rotation[index] = NormalizeAngle(item.Rotation[index] + amount);
+                        changed = true;
+                    }
+                }
+
+                if (!changed) continue;
+                if (scene.Objects.TryGetValue(item.Id, out var scriptObject))
+                {
+                    scriptObject.Set("rotation", new VelvVector3(
+                        item.Rotation[0], item.Rotation[1], item.Rotation[2]));
+                }
+                SceneObjectChanged?.Invoke(scene.Key, item);
+            }
+        }
+    }
+
+    private void UpdateSceneManager()
+    {
+        _sceneManager.Set("current", ActiveSceneName ?? "");
+    }
+
+    private TransformSnapshot IntegrateVelocity(ScriptObject scriptObject, TransformSnapshot position)
+    {
+        object? velocity = null;
+
+        foreach (var scene in _scenes.Values)
+        {
+            var binding = scene.Bindings.FirstOrDefault(item => ReferenceEquals(item.Script, scriptObject));
+            if (binding is null) continue;
+
+            if (scriptObject.TryGet(binding.Scene.Type, out var component) && component is ScriptObject body &&
+                body.TryGet("velocity", out var bodyVelocity))
+                velocity = bodyVelocity;
+            break;
+        }
+
+        if (velocity is null && scriptObject.TryGet("velocity", out var topVelocity))
+            velocity = topVelocity;
 
         return velocity switch
         {
-            VelvVector3 vector3 => (
+            VelvVector3 vector3 when vector3.Magnitude > 0.000001 => new TransformSnapshot(
                 position.X + vector3.X * _deltaTime,
                 position.Y + vector3.Y * _deltaTime,
-                position.Z + vector3.Z * _deltaTime),
-            VelvVector2 vector2 => (
+                position.Z + vector3.Z * _deltaTime,
+                position.RotationX, position.RotationY, position.RotationZ),
+            VelvVector2 vector2 when vector2.Magnitude > 0.000001 => new TransformSnapshot(
                 position.X + vector2.X * _deltaTime,
                 position.Y + vector2.Y * _deltaTime,
-                position.Z),
+                position.Z,
+                position.RotationX, position.RotationY, position.RotationZ),
             _ => position
         };
     }
 
-    private static (double X, double Y, double Z) ReadPosition(ScriptObject scriptObject)
+    private static TransformSnapshot ReadTransform(ScriptObject scriptObject)
     {
-        if (!scriptObject.TryGet("position", out var value)) return (0, 0, 0);
-        return value switch
+        var x = 0.0;
+        var y = 0.0;
+        var z = 0.0;
+
+        if (scriptObject.TryGet("position", out var value))
         {
-            VelvVector3 vector3 => (vector3.X, vector3.Y, vector3.Z),
-            VelvVector2 vector2 => (vector2.X, vector2.Y, 0),
-            _ => (0, 0, 0)
-        };
+            switch (value)
+            {
+                case VelvVector3 vector3:
+                    x = vector3.X;
+                    y = vector3.Y;
+                    z = vector3.Z;
+                    break;
+                case VelvVector2 vector2:
+                    x = vector2.X;
+                    y = vector2.Y;
+                    break;
+            }
+        }
+
+        var rotationX = 0.0;
+        var rotationY = 0.0;
+        var rotationZ = 0.0;
+        if (scriptObject.TryGet("rotation", out var rotation) && rotation is VelvVector3 rotation3)
+        {
+            rotationX = rotation3.X;
+            rotationY = rotation3.Y;
+            rotationZ = rotation3.Z;
+        }
+
+        return new TransformSnapshot(x, y, z, rotationX, rotationY, rotationZ);
     }
 
-    private static void WritePosition(ScriptObject scriptObject, (double X, double Y, double Z) position)
+    private static void WritePosition(ScriptObject scriptObject, TransformSnapshot transform)
     {
         if (scriptObject.TryGet("position", out var current))
         {
             if (current is VelvVector3)
             {
-                scriptObject.Set("position", new VelvVector3(position.X, position.Y, position.Z));
+                scriptObject.Set("position", new VelvVector3(transform.X, transform.Y, transform.Z));
                 return;
             }
             if (current is VelvVector2)
             {
-                scriptObject.Set("position", new VelvVector2(position.X, position.Y));
+                scriptObject.Set("position", new VelvVector2(transform.X, transform.Y));
                 return;
             }
         }
 
-        scriptObject.Set("position", new VelvVector3(position.X, position.Y, position.Z));
+        scriptObject.Set("position", new VelvVector3(transform.X, transform.Y, transform.Z));
     }
 
-    private static bool NearlyEqual((double X, double Y, double Z) left, (double X, double Y, double Z) right) =>
+    private static double NormalizeAngle(double angle)
+    {
+        angle %= 360;
+        return angle < 0 ? angle + 360 : angle;
+    }
+
+    private static bool NearlyEqual(TransformSnapshot left, TransformSnapshot right) =>
         Math.Abs(left.X - right.X) < 1e-9 &&
         Math.Abs(left.Y - right.Y) < 1e-9 &&
         Math.Abs(left.Z - right.Z) < 1e-9;
@@ -262,5 +702,57 @@ public sealed class GameSession : IScriptHost
         return true;
     }
 
+    private static string ToText(object? value) => value switch
+    {
+        null => "",
+        string text => text,
+        bool boolean => boolean ? "true" : "false",
+        _ => value.ToString() ?? ""
+    };
+
+    private sealed class SceneInstance(
+        string key,
+        string? path,
+        SceneDocument document,
+        ScriptObject root,
+        List<Binding> bindings,
+        Dictionary<string, ScriptObject> objects)
+    {
+        public string Key { get; } = key;
+        public string? Path { get; } = path;
+        public SceneDocument Document { get; } = document;
+        public ScriptObject Root { get; } = root;
+        public List<Binding> Bindings { get; } = bindings;
+        public Dictionary<string, ScriptObject> Objects { get; } = objects;
+    }
+
     private sealed record Binding(SceneObject Scene, ScriptObject Script);
+
+    private sealed record ComponentScript(
+        SceneInstance Scene,
+        SceneObject Item,
+        Interpreter Interpreter,
+        string ScriptPath);
+
+    private readonly record struct TransformSnapshot(
+        double X, double Y, double Z,
+        double RotationX, double RotationY, double RotationZ);
+
+    private sealed class ComponentHost(GameSession session, ScriptObject self, string objectName, string scriptName)
+        : IScriptHost
+    {
+        public double DeltaTime => session.DeltaTime;
+        public ScriptObject GetThis() => self;
+        public ScriptObject SceneManager => session.SceneManager;
+        public ScriptObject GetSceneRoot(string sceneName) => session.GetSceneRoot(sceneName);
+        public ScriptObject GetAssetObject(string path) => session.GetAssetObject(path);
+        public VelvVector2 GetInputVectors(IReadOnlyList<string> actions) => session.GetInputVectors(actions);
+        public bool IsActionDown(string action) => session.IsActionDown(action);
+        public bool LoadScene(string nameOrPath) => session.LoadScene(nameOrPath);
+        public bool UnloadScene(string nameOrPath) => session.UnloadScene(nameOrPath);
+        public bool SetActiveScene(string nameOrPath) => session.SetActiveScene(nameOrPath);
+        public bool IsSceneLoaded(string nameOrPath) => session.IsSceneLoaded(nameOrPath);
+        public void Show(string message, ScriptLogLevel level) =>
+            session.Output?.Invoke($"[{objectName}/{scriptName}] {message}", level);
+    }
 }

@@ -132,13 +132,37 @@ console.error("falhou");
 ```velv
 var delta = game.delta_time;
 var direcao = game.get_input_vectors("direita", "esquerda", "baixo", "cima");
+var atacando = game.get_input("atacar");
 ```
 
-`get_input_vectors` devolve um `Vector2` com `x` e `y` entre `-1` e `1`. A ordem documentada é: positivo X, negativo X, positivo Y, negativo Y. Os nomes são reconhecidos por significado (`direita`/`right`, `esquerda`/`left`, `cima`/`up`/`frente`, `baixo`/`down`/`trás`), então a ordem não muda o resultado. Os comandos padrão são **WASD** e as **setas**.
+`get_input_vectors` devolve um `Vector2` com `x` e `y` entre `-1` e `1`. A ordem documentada é: positivo X, negativo X, positivo Y, negativo Y. Os nomes são reconhecidos por significado (`direita`/`right`, `esquerda`/`left`, `cima`/`up`/`frente`, `baixo`/`down`/`trás`), então a ordem não muda o resultado.
+
+`get_input("ação")` devolve `true` enquanto alguma tecla mapeada para a ação estiver pressionada. Use o nome exato da ação criada em **Project Settings → Entradas**. Se a ação não existir, os nomes de direção continuam caindo no padrão **WASD** e **setas**.
+
+### Inputs personalizados
+
+As ações são definidas no projeto (`<Projeto>.velvxproj`, campo `inputs`), não no script. Abra **Project Settings** (`Ctrl+,`) → aba **Entradas**, clique em **Adicionar entrada**, escolha o nome e as teclas (ex.: `Q`, `Espace`, `LeftShift`, `F5`) e salve. O script então usa:
+
+```velv
+func InGame()
+{
+    if game.get_input("atacar")
+    {
+        console.show("Ataque!");
+    }
+
+    if game.get_input("interagir")
+    {
+        Scene("Arena").load();
+    }
+}
+```
+
+O editor valida o nome da ação e avisa quando ele não existe. Teclas aceitas incluem letras (`A`–`Z`), números, setas, `Espace`/`Space`, `Enter`, `Shift`, `Ctrl`, `Alt`, `Tab`, `Backspace` e `F1`–`F12`.
 
 ### this
 
-`this` representa o objeto do jogador — o objeto cujo script é o ponto de entrada (`EntryScript`) ou, na falta dele, o primeiro `CharacterBody3D`/`CharacterBody2D` da cena.
+`this` representa o objeto dono do script. No script de entrada (`EntryScript`) ou em um componente de script, `this` é o objeto ao qual o script foi associado — o jogador, no caso da entrada.
 
 ```velv
 this.position = new.Vector3(0, 2, 0);
@@ -146,7 +170,19 @@ this.visible = false;
 this.CharacterBody3D.velocity = new.Vector3(6, 0, 0);
 ```
 
-O componente `CharacterBody3D`/`CharacterBody2D` expõe `velocity`, `position` e `on_ground`. A `velocity` do componente é integrada à posição do jogador a cada quadro (a Engine cuida do movimento).
+Todo objeto expõe `id`, `name`, `position`, `rotation`, `scale`, `visible` e `tag`. O componente `CharacterBody3D`/`CharacterBody2D` expõe `velocity`, `position` e `on_ground`. A `velocity` do componente é integrada à posição do jogador a cada quadro (a Engine cuida do movimento).
+
+### Componentes
+
+Cada objeto pode ter componentes adicionados pelo inspetor (**+ Componente**):
+
+| Componente | O que faz |
+| --- | --- |
+| `Script` | executa um arquivo `.velv` com `Main()` e `InGame()` no escopo do objeto |
+| `Rotator` | gira o objeto continuamente em torno de um eixo, na velocidade configurada |
+| `PointLight` | adiciona uma luz pontual ao objeto, com intensidade e alcance |
+
+Componentes de script rodam depois do script de entrada (`Main.velv`) e antes dos componentes nativos, todos no mesmo quadro. Vários objetos podem usar o mesmo arquivo de script — cada instância tem o seu próprio `this`.
 
 ### Scene
 
@@ -157,6 +193,52 @@ var outro = Scene("Main").object.player;  # pelo id (sem diferenciar maiúsculas
 ```
 
 `Scene(nome)` devolve a cena ativa; `object` é a raiz da cena e cada objeto aparece nela pelo **nome** ou pelo **id**. Todo objeto expõe `id`, `position`, `rotation`, `scale` e `visible`.
+
+### Streaming de cenas
+
+```velv
+func Main()
+{
+    console.show("Cena inicial carregada.");
+}
+
+func InGame()
+{
+    # Carrega a arena quando o jogador se aproxima da porta.
+    if this.position.z < -4 and not Scene("Arena").is_loaded()
+    {
+        Scene("Arena").load();
+        console.show("Arena carregada.");
+    }
+
+    # Descarrega quando o jogador volta para a praça.
+    if this.position.z > 2 and Scene("Arena").is_loaded()
+    {
+        Scene("Arena").unload();
+    }
+
+    # Troca a cena ativa (a que recebe `this` e os inputs do jogo).
+    if game.get_input("entrar_arena")
+    {
+        Scene("Arena").set_active();
+    }
+}
+```
+
+Cada cena mantém seu próprio arquivo `.scene.json` em `Scenes/` e o nome usado no script é o nome do arquivo, sem extensão. A cena ativa é a que o `this` do script de entrada enxerga e a que os comandos de direção movimentam.
+
+O gerenciador global `Scenes` oferece as mesmas operações por nome:
+
+```velv
+Scenes.load("Arena");
+Scenes.is_loaded("Arena");
+Scenes.unload("Arena");
+Scenes.set_active("Arena");
+console.show(Scenes.current);   # nome da cena ativa
+console.show(Scenes.loaded());  # lista separada por vírgulas
+```
+
+Uma cena carregada continua na memória (e aparece no rodapé da hierarquia) até ser descarregada ou até o Play terminar. Carregar duas vezes a mesma cena não duplica nada.
 
 ### Assets
 
@@ -209,4 +291,4 @@ func InGame()
 
 ## Ainda não disponível
 
-Arrays/listas com indexação, `for`, classes/tipos personalizados, funções anônimas, `switch`, importação de módulos, física e colisões, áudio, animação e salvamento de estado. Essas peças entram nas próximas etapas da Engine.
+Arrays/listas com indexação, `for`, classes/tipos personalizados, funções anônimas, `switch`, importação de módulos, física e colisões, áudio, controle de animação por script (modelos 3D já tocam animações embutidas), câmera de jogo dedicada e salvamento de estado. Essas peças entram nas próximas etapas da Engine.

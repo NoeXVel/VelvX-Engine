@@ -1,0 +1,7 @@
+func Main()
+{
+    console.show("pos=" + this.position.x + "," + this.position.y + "," + this.position.z);
+}
+func InGame()
+{
+}

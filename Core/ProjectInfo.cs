@@ -7,7 +7,7 @@ namespace VelvX.Engine.Core;
 public sealed class ProjectInfo
 {
     public string Name { get; set; } = "";
-    public string Version { get; set; } = "0.1.0";
+    public string Version { get; set; } = "0.2.0";
     public string Template { get; set; } = "";
     public string Mode { get; set; } = "3D";
     public string Language { get; set; } = EnginePaths.Language;
@@ -15,6 +15,49 @@ public sealed class ProjectInfo
     public string StartScene { get; set; } = "Scenes/Main.scene.json";
     public string EngineVersion { get; set; } = EnginePaths.Version;
     public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public List<SceneEntry> Scenes { get; set; } = [];
+    public InputMap Inputs { get; set; } = new();
+    public RenderSettings Render { get; set; } = new();
+
+    /// <summary>Garante que projetos antigos ganhem os campos novos sem perder dados.</summary>
+    public void Normalize()
+    {
+        Scenes ??= [];
+        Inputs ??= new InputMap();
+        Render ??= new RenderSettings();
+
+        if (Inputs.Actions.Count == 0)
+            Inputs = InputMap.CreateDefault();
+
+        if (string.IsNullOrWhiteSpace(StartScene))
+            StartScene = "Scenes/Main.scene.json";
+
+        if (Scenes.Count == 0)
+        {
+            Scenes.Add(new SceneEntry
+            {
+                Name = Path.GetFileNameWithoutExtension(StartScene),
+                Path = StartScene,
+                Start = true
+            });
+        }
+
+        if (!Scenes.Any(scene => scene.Start))
+        {
+            var start = Scenes.FirstOrDefault(scene =>
+                            string.Equals(scene.Path, StartScene, StringComparison.OrdinalIgnoreCase))
+                        ?? Scenes[0];
+            start.Start = true;
+            StartScene = start.Path;
+        }
+        else
+        {
+            var start = Scenes.First(scene => scene.Start);
+            StartScene = start.Path;
+            foreach (var scene in Scenes.Where(scene => !ReferenceEquals(scene, start)))
+                scene.Start = false;
+        }
+    }
 }
 
 public sealed class GameProject
@@ -38,10 +81,43 @@ public sealed class GameProject
     [JsonIgnore]
     public bool Is3D => string.Equals(Info.Mode, "3D", StringComparison.OrdinalIgnoreCase);
 
-    private string Resolve(string relative, string fallback)
+    public string Resolve(string relative, string fallback)
     {
         var normalized = string.IsNullOrWhiteSpace(relative) ? fallback : relative.Replace('/', Path.DirectorySeparatorChar);
         return Path.Combine(FolderPath, normalized);
+    }
+
+    public string ResolveAsset(string? relative)
+    {
+        if (string.IsNullOrWhiteSpace(relative)) return "";
+        var clean = relative.Replace('/', Path.DirectorySeparatorChar);
+        return Path.IsPathRooted(clean) ? clean : Path.Combine(FolderPath, clean);
+    }
+
+    public string ToRelativePath(string absolutePath)
+    {
+        var full = Path.GetFullPath(absolutePath);
+        var root = Path.GetFullPath(FolderPath).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return full.Replace('\\', '/');
+        return full[root.Length..].Replace('\\', '/');
+    }
+
+    public SceneEntry? FindScene(string nameOrPath) => Info.Scenes.FirstOrDefault(scene =>
+        string.Equals(scene.Name, nameOrPath, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(scene.Path, nameOrPath.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(Path.GetFileNameWithoutExtension(scene.Path), nameOrPath, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Cria as pastas padrão do projeto e migra metadados antigos.</summary>
+    public void EnsureLayout()
+    {
+        Info.Normalize();
+        Directory.CreateDirectory(FolderPath);
+        foreach (var folder in new[]
+                 {
+                     "Scenes", "Scripts", "Assets", "Assets/Models", "Assets/Textures",
+                     "Assets/Sprites", "Assets/Audio", "Prefabs"
+                 })
+            Directory.CreateDirectory(Path.Combine(FolderPath, folder.Replace('/', Path.DirectorySeparatorChar)));
     }
 
     public static GameProject Open(string projectFile)
@@ -57,11 +133,13 @@ public sealed class GameProject
         if (string.IsNullOrWhiteSpace(info.Name))
             throw new InvalidDataException("O projeto não tem um nome válido.");
 
-        return new GameProject
+        var project = new GameProject
         {
             Info = info,
             FolderPath = Path.GetDirectoryName(fullPath) ?? ""
         };
+        project.EnsureLayout();
+        return project;
     }
 
     public static GameProject OpenFolder(string folder)
@@ -80,6 +158,7 @@ public sealed class GameProject
 
     public void Save()
     {
+        Info.Normalize();
         Directory.CreateDirectory(FolderPath);
         File.WriteAllText(ProjectFilePath, JsonSerializer.Serialize(Info, JsonOptions.Write));
     }

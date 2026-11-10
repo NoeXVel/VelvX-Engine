@@ -1,14 +1,23 @@
 {
   "name": "Main",
   "mode": "3D",
+  "environment": {
+    "ambient": "#596080",
+    "ambientIntensity": 1.0,
+    "sunColor": "#FFF1DD",
+    "sunIntensity": 1.15,
+    "sunYaw": -35.0,
+    "sunPitch": -55.0,
+    "backgroundTop": "#090A12",
+    "backgroundBottom": "#1B1430",
+    "fogColor": "#120F1E",
+    "fogDensity": 0.0
+  },
   "objects": [
     {
-      "id": "player",
-      "name": "Player",
-      "type": "CharacterBody3D",
       "position": [
         0,
-        0.9,
+        0.1,
         0
       ],
       "rotation": [
@@ -21,13 +30,13 @@
         1.8,
         1
       ],
+      "id": "player",
+      "name": "Player",
+      "type": "CharacterBody3D",
       "color": "#A98BFF",
       "script": "Scripts/Main.velv"
     },
     {
-      "id": "ground",
-      "name": "Chão",
-      "type": "Box",
       "position": [
         0,
         -0.1,
@@ -43,15 +52,36 @@
         0.2,
         20
       ],
+      "id": "ground",
+      "name": "Chão",
+      "type": "Box",
       "color": "#262B3A"
     },
     {
+      "position": [
+        -6,
+        0,
+        -4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        3,
+        1
+      ],
       "id": "pillar-left",
       "name": "Pilar Esquerdo",
       "type": "Box",
+      "color": "#3B3358"
+    },
+    {
       "position": [
-        -6,
-        1.5,
+        6,
+        0,
         -4
       ],
       "rotation": [
@@ -64,36 +94,15 @@
         3,
         1
       ],
-      "color": "#3B3358"
-    },
-    {
       "id": "pillar-right",
       "name": "Pilar Direito",
       "type": "Box",
-      "position": [
-        6,
-        1.5,
-        -4
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        3,
-        1
-      ],
       "color": "#3B3358"
     },
     {
-      "id": "orb",
-      "name": "Esfera",
-      "type": "Sphere",
       "position": [
         0,
-        1.6,
+        1.1,
         -7
       ],
       "rotation": [
@@ -106,15 +115,23 @@
         1.7,
         1.7
       ],
-      "color": "#8B6CFF"
+      "id": "orb",
+      "name": "Esfera",
+      "type": "Sphere",
+      "color": "#8B6CFF",
+      "components": [
+        {
+          "type": "Rotator",
+          "axis": "Y",
+          "speed": 35,
+          "enabled": true
+        }
+      ]
     },
     {
-      "id": "platform",
-      "name": "Plataforma",
-      "type": "Box",
       "position": [
         4,
-        0.4,
+        0,
         -2
       ],
       "rotation": [
@@ -127,7 +144,55 @@
         0.8,
         4
       ],
+      "id": "platform",
+      "name": "Plataforma",
+      "type": "Box",
       "color": "#332D50"
+    },
+    {
+      "position": [
+        4,
+        2.6,
+        -2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "id": "point-light",
+      "name": "Luz da Plataforma",
+      "type": "PointLight",
+      "color": "#B79BFF",
+      "intensity": 1.8,
+      "range": 11
+    },
+    {
+      "position": [
+        0,
+        4,
+        -2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "id": "volume",
+      "name": "Global Volume",
+      "type": "GlobalVolume",
+      "color": "#6A55A8",
+      "intensity": 0.7
     }
   ]
 }

@@ -4,8 +4,10 @@ Cada pasta aqui com um `template.json` aparece na tela **Novo projeto** do launc
 
 | Pasta | Modo | Conteúdo |
 | --- | --- | --- |
-| `Starter-3D` | 3D | chão, pilares, plataforma, esfera e Player com movimento por WASD |
-| `Starter-2D` | 2D | fundo, chão, plataforma, orbe e Player com movimento por WASD |
+| `Starter-3D` | 3D | chão, pilares, plataforma, esfera animada, Player, luz pontual, Global Volume e streaming para a cena `Arena` |
+| `Starter-2D` | 2D | fundo, chão, plataforma, orbe GIF, estrela, spritesheet do herói, Player e streaming para `Floresta` |
+
+Os dois templates também trazem cenas de streaming, pastas de assets, um prefab de exemplo e scripts comentados com inputs personalizados.
 
 ## Criar o seu template
 
@@ -20,7 +22,7 @@ Cada pasta aqui com um `template.json` aparece na tela **Novo projeto** do launc
   "name": "Meu template",
   "description": "Minha base de jogo personalizada.",
   "mode": "3D",
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
 ```
 

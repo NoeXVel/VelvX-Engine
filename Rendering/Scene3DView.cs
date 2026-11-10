@@ -1,40 +1,69 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using System.Windows.Threading;
 using VelvX.Engine.Core;
 
 namespace VelvX.Engine.Rendering;
 
+/// <summary>
+/// Viewport 3D do editor: modelos animados, iluminação de cena, volumes,
+/// gizmos coloridos de translação e navegação WASD.
+/// </summary>
 public sealed class Scene3DView : Grid
 {
     private static readonly Color BackgroundColor = Color.FromRgb(10, 11, 16);
     private static readonly Color AccentColor = Color.FromRgb(169, 139, 255);
+    private static readonly Color AxisXColor = Color.FromRgb(255, 90, 108);
+    private static readonly Color AxisYColor = Color.FromRgb(96, 226, 154);
+    private static readonly Color AxisZColor = Color.FromRgb(92, 158, 255);
 
     private readonly Viewport3D _viewport = new();
     private readonly PerspectiveCamera _camera = new()
     {
         FieldOfView = 55,
-        NearPlaneDistance = 0.5,
-        FarPlaneDistance = 800
+        NearPlaneDistance = 0.2,
+        FarPlaneDistance = 1200
     };
 
     private readonly ModelVisual3D _gridVisual = new();
+    private readonly ModelVisual3D _environmentVisual = new();
+    private readonly ModelVisual3D _lightsVisual = new();
+    private readonly ModelVisual3D _objectsVisual = new();
+    private readonly ModelVisual3D _componentLightsVisual = new();
+    private readonly GizmoLayer _gizmo = new();
+
     private readonly Dictionary<string, ModelVisual3D> _visuals = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SceneObject> _objects = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ModelAsset> _modelCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, AnimationState> _animationStates = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Model3D> _hitModels = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _visualModelPaths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<Key> _keys = [];
+
     private readonly MeshGeometry3D _boxMesh = CreateBoxMesh();
     private readonly MeshGeometry3D _sphereMesh = CreateSphereMesh();
+    private readonly DispatcherTimer _animationTimer;
+    private readonly System.Diagnostics.Stopwatch _animationClock = System.Diagnostics.Stopwatch.StartNew();
 
     private SceneDocument? _scene;
     private string? _selectedId;
     private Point _lastMouse;
     private bool _orbiting;
     private bool _panning;
+    private bool _draggingGizmo;
+    private int _dragAxis;
+    private Point _dragStartScreen;
+    private double[] _dragStartPosition = [0, 0, 0];
+    private double _dragUnitsPerPixel = 1;
     private double _yaw = -38;
     private double _pitch = 16;
     private double _distance = 18;
     private Point3D _target = new(0, 1.1, 0);
+    private double _lastAnimationTime;
 
     public Scene3DView()
     {
@@ -45,54 +74,86 @@ public sealed class Scene3DView : Grid
         _viewport.Camera = _camera;
         Children.Add(_viewport);
 
-        BuildLights();
+        _gizmo.IsHitTestVisible = false;
+        Children.Add(_gizmo);
+
         BuildGrid();
+        _viewport.Children.Add(_environmentVisual);
+        _viewport.Children.Add(_lightsVisual);
+        _viewport.Children.Add(_objectsVisual);
+        _viewport.Children.Add(_componentLightsVisual);
 
         MouseDown += OnMouseDown;
         MouseMove += OnMouseMove;
         MouseUp += OnMouseUp;
         MouseWheel += OnMouseWheel;
-        MouseLeave += (_, _) => { _orbiting = false; _panning = false; };
+        MouseDown += (_, _) => { if (!IsPlaying) Focus(); };
+        MouseLeave += (_, _) => { _orbiting = false; _panning = false; _draggingGizmo = false; };
+        KeyDown += OnViewKeyDown;
+        KeyUp += OnViewKeyUp;
+        LostKeyboardFocus += (_, _) => _keys.Clear();
+        SizeChanged += (_, _) => UpdateGizmo();
+
+        _animationTimer = new DispatcherTimer(DispatcherPriority.Render)
+        {
+            Interval = TimeSpan.FromMilliseconds(33)
+        };
+        _animationTimer.Tick += OnAnimationTick;
+        _animationTimer.Start();
 
         UpdateCamera();
     }
+
+    public event Action<string?>? ObjectSelected;
+    public event Action<SceneObject>? TransformChanged;
+
+    public Func<string, string>? ResolveAsset { get; set; }
+    public bool IsPlaying { get; set; }
 
     public void LoadScene(SceneDocument scene)
     {
         _scene = scene;
         Rebuild();
+        ApplyEnvironment();
+        _gizmo.Clear();
+        UpdateGizmo();
     }
 
     public void RefreshObject(SceneObject item)
     {
         if (_scene is null) return;
         _objects[item.Id] = item;
+
         if (!_visuals.TryGetValue(item.Id, out var visual))
         {
             Rebuild();
+            UpdateGizmo();
             return;
         }
 
-        visual.Transform = CreateTransform(item);
-        if (visual.Content is GeometryModel3D model)
+        if (item.Type == "Model3D" && !string.IsNullOrWhiteSpace(item.Model))
         {
-            var material = CreateMaterial(item, IsSelected(item));
-            model.Material = material;
-            model.BackMaterial = material;
+            // O modelo pode ter sido importado/trocado depois da criação do visual.
+            if (!_visualModelPaths.TryGetValue(item.Id, out var current) ||
+                !string.Equals(current, item.Model, StringComparison.OrdinalIgnoreCase))
+            {
+                Rebuild();
+                UpdateGizmo();
+                return;
+            }
         }
+
+        visual.Transform = CreateTransform(item);
+        SyncAnimation(item);
+        RebuildComponentLights();
+        UpdateGizmo();
     }
 
     public void SetSelected(string? id)
     {
         if (string.Equals(_selectedId, id, StringComparison.OrdinalIgnoreCase)) return;
         _selectedId = id;
-
-        foreach (var pair in _visuals)
-        {
-            if (pair.Value.Content is not GeometryModel3D model) continue;
-            if (!_objects.TryGetValue(pair.Key, out var item)) continue;
-            model.Material = CreateMaterial(item, IsSelected(item));
-        }
+        UpdateGizmo();
     }
 
     public void ResetCamera()
@@ -102,6 +163,22 @@ public sealed class Scene3DView : Grid
         _distance = 18;
         _target = new Point3D(0, 1.1, 0);
         UpdateCamera();
+        UpdateGizmo();
+    }
+
+    public void FocusOn(SceneObject item)
+    {
+        _target = new Point3D(item.X, item.Y + 0.6, item.Z);
+        _distance = Math.Max(4, _distance * 0.6);
+        UpdateCamera();
+        UpdateGizmo();
+    }
+
+    public void SetPlayMode(bool playing)
+    {
+        IsPlaying = playing;
+        if (playing) _keys.Clear();
+        UpdateGizmo();
     }
 
     private bool IsSelected(SceneObject item) =>
@@ -109,43 +186,304 @@ public sealed class Scene3DView : Grid
 
     private void Rebuild()
     {
-        foreach (var visual in _visuals.Values)
-            _viewport.Children.Remove(visual);
-
+        _objectsVisual.Children.Clear();
         _visuals.Clear();
         _objects.Clear();
+        _hitModels.Clear();
+        _visualModelPaths.Clear();
+        _animationStates.Clear();
+        _componentLightsVisual.Children.Clear();
         if (_scene is null) return;
 
         foreach (var item in _scene.Objects)
         {
+            if (!item.Visible) continue;
             _objects[item.Id] = item;
-            if (item.Type is "Camera3D" or "Camera2D" or "DirectionalLight") continue;
+
+            if (item.Type is "GlobalVolume")
+            {
+                BuildGlobalVolumeMarker(item);
+                continue;
+            }
+
+            if (item.IsVolume)
+            {
+                BuildVolume(item);
+                continue;
+            }
+
+            if (item.Type == "PointLight")
+            {
+                BuildPointLight(item);
+                continue;
+            }
+
+            if (item.Type is "Camera3D" or "Camera2D" or "DirectionalLight")
+            {
+                BuildMarker(item);
+                continue;
+            }
+
+            if (item.Type == "Model3D" && !string.IsNullOrWhiteSpace(item.Model))
+            {
+                if (TryBuildModel(item)) continue;
+            }
 
             var mesh = item.Type == "Sphere" ? _sphereMesh : _boxMesh;
             var material = CreateMaterial(item, IsSelected(item));
-            var model = new GeometryModel3D(mesh, material)
-            {
-                BackMaterial = material
-            };
+            var model = new GeometryModel3D(mesh, material) { BackMaterial = material };
             var visual = new ModelVisual3D
             {
                 Content = model,
                 Transform = CreateTransform(item)
             };
-
+            _hitModels[item.Id] = model;
             _visuals[item.Id] = visual;
-            _viewport.Children.Add(visual);
+            _objectsVisual.Children.Add(visual);
+        }
+
+        RebuildComponentLights();
+    }
+
+    /// <summary>Luzes pontuais vindas de componentes ficam em espaço de mundo.</summary>
+    private void RebuildComponentLights()
+    {
+        _componentLightsVisual.Children.Clear();
+        if (_scene is null) return;
+
+        foreach (var item in _scene.Objects)
+        {
+            if (!item.Visible) continue;
+            foreach (var component in item.Components)
+            {
+                if (!component.Enabled ||
+                    !string.Equals(component.Type, "PointLight", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var color = ParseColor(component.Color);
+                var light = new PointLight(color, new Point3D(item.X, item.Y, item.Z))
+                {
+                    Range = Math.Max(0.5, component.Range * Math.Max(0.2, component.Amount))
+                };
+                _componentLightsVisual.Children.Add(new ModelVisual3D { Content = light });
+            }
         }
     }
 
-    private void BuildLights()
+    private bool TryBuildModel(SceneObject item)
     {
-        var lights = new Model3DGroup();
-        lights.Children.Add(new AmbientLight(Color.FromRgb(88, 90, 110)));
-        lights.Children.Add(new DirectionalLight(Colors.White, new Vector3D(-0.55, -1, -0.45)));
-        lights.Children.Add(new DirectionalLight(Color.FromRgb(92, 72, 150), new Vector3D(0.85, -0.2, 0.65)));
+        var path = ResolveAsset?.Invoke(item.Model!) ?? item.Model!;
+        try
+        {
+            if (!_modelCache.TryGetValue(path, out var asset))
+            {
+                if (!File.Exists(path)) throw new FileNotFoundException("Modelo não encontrado.", path);
+                asset = ModelAsset.Load(path);
+                _modelCache[path] = asset;
+            }
 
-        _viewport.Children.Add(new ModelVisual3D { Content = lights });
+            var content = new Model3DGroup();
+            content.Children.Add(asset.Root);
+
+            var visual = new ModelVisual3D
+            {
+                Content = content,
+                Transform = CreateTransform(item)
+            };
+            _hitModels[item.Id] = content;
+            _visualModelPaths[item.Id] = item.Model ?? "";
+            _visuals[item.Id] = visual;
+            _objectsVisual.Children.Add(visual);
+            SyncAnimation(item);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void BuildMarker(SceneObject item)
+    {
+        var color = item.Type == "DirectionalLight" ? Color.FromRgb(255, 226, 160) : Color.FromRgb(150, 190, 255);
+        var material = new MaterialGroup();
+        material.Children.Add(new DiffuseMaterial(new SolidColorBrush(color)));
+        material.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromArgb(120, color.R, color.G, color.B))));
+        var model = new GeometryModel3D(_sphereMesh, material) { BackMaterial = material };
+        var visual = new ModelVisual3D
+        {
+            Content = model,
+            Transform = CreateTransform(item, 0.35, 1.5)
+        };
+        _hitModels[item.Id] = model;
+        _visuals[item.Id] = visual;
+        _objectsVisual.Children.Add(visual);
+    }
+
+    private void BuildPointLight(SceneObject item)
+    {
+        var color = ParseColor(item.Color);
+        var material = new MaterialGroup();
+        material.Children.Add(new EmissiveMaterial(new SolidColorBrush(color)));
+        material.Children.Add(new DiffuseMaterial(new SolidColorBrush(Blend(color, Colors.White, 0.25))));
+        var model = new GeometryModel3D(_sphereMesh, material) { BackMaterial = material };
+        var visual = new ModelVisual3D
+        {
+            Content = model,
+            Transform = CreateTransform(item, 0.22, 1.4)
+        };
+        _hitModels[item.Id] = model;
+        _visuals[item.Id] = visual;
+        _objectsVisual.Children.Add(visual);
+
+        var light = new PointLight(color, new Point3D(item.X, item.Y, item.Z))
+        {
+            Range = Math.Max(0.5, item.Range * Math.Max(0.2, item.Intensity))
+        };
+        visual.Children.Add(new ModelVisual3D { Content = light });
+    }
+
+    private void BuildVolume(SceneObject item)
+    {
+        var color = ParseColor(item.Color);
+        var brush = new SolidColorBrush(Color.FromArgb(46, color.R, color.G, color.B));
+        brush.Freeze();
+        var material = new DiffuseMaterial(brush);
+        var model = new GeometryModel3D(_boxMesh, material) { BackMaterial = material };
+        var visual = new ModelVisual3D
+        {
+            Content = model,
+            Transform = CreateTransform(item)
+        };
+        _hitModels[item.Id] = model;
+        _visuals[item.Id] = visual;
+        _objectsVisual.Children.Add(visual);
+    }
+
+    private void BuildGlobalVolumeMarker(SceneObject item)
+    {
+        var color = ParseColor(item.Color);
+        var material = new EmissiveMaterial(new SolidColorBrush(Color.FromArgb(150, color.R, color.G, color.B)));
+        var model = new GeometryModel3D(_sphereMesh, material) { BackMaterial = material };
+        var visual = new ModelVisual3D
+        {
+            Content = model,
+            Transform = CreateTransform(item, 0.3, 1.4)
+        };
+        _hitModels[item.Id] = model;
+        _visuals[item.Id] = visual;
+        _objectsVisual.Children.Add(visual);
+    }
+
+    private void SyncAnimation(SceneObject item)
+    {
+        if (!_animationStates.TryGetValue(item.Id, out var state) ||
+            !string.Equals(state.Clip, item.Animation, StringComparison.OrdinalIgnoreCase) ||
+            Math.Abs(state.Speed - item.AnimationSpeed) > 0.0001 ||
+            state.Loop != item.AnimationLoop)
+        {
+            _animationStates[item.Id] = new AnimationState(item.Animation, item.AnimationSpeed, item.AnimationLoop, 0);
+            var path = ResolveAsset?.Invoke(item.Model ?? "") ?? item.Model ?? "";
+            if (_modelCache.TryGetValue(path, out var asset))
+                asset.SetClip(item.Animation, item.AnimationSpeed, item.AnimationLoop);
+        }
+    }
+
+    private void OnAnimationTick(object? sender, EventArgs e)
+    {
+        var now = _animationClock.Elapsed.TotalSeconds;
+        var delta = _lastAnimationTime <= 0 ? 0 : now - _lastAnimationTime;
+        _lastAnimationTime = now;
+        if (delta <= 0 || delta > 0.25) return;
+
+        if (!IsPlaying) MoveEditorCamera(delta);
+
+        foreach (var pair in _animationStates)
+        {
+            if (!_objects.TryGetValue(pair.Key, out var item)) continue;
+            var path = ResolveAsset?.Invoke(item.Model ?? "") ?? item.Model ?? "";
+            if (_modelCache.TryGetValue(path, out var asset)) asset.Update(delta);
+        }
+    }
+
+    private void MoveEditorCamera(double delta)
+    {
+        if (_keys.Count == 0) return;
+
+        var forward = _camera.LookDirection;
+        forward.Y = 0;
+        if (forward.LengthSquared < 0.00001) forward = new Vector3D(0, 0, -1);
+        forward.Normalize();
+
+        var right = Vector3D.CrossProduct(forward, new Vector3D(0, 1, 0));
+        right.Normalize();
+
+        var speed = Math.Max(2.2, _distance * 0.55) * delta;
+        if (_keys.Contains(Key.LeftShift)) speed *= 2.6;
+        if (_keys.Contains(Key.LeftCtrl)) speed *= 0.35;
+
+        var move = new Vector3D();
+        if (_keys.Contains(Key.W) || _keys.Contains(Key.Up)) move += forward;
+        if (_keys.Contains(Key.S) || _keys.Contains(Key.Down)) move -= forward;
+        if (_keys.Contains(Key.D) || _keys.Contains(Key.Right)) move += right;
+        if (_keys.Contains(Key.A) || _keys.Contains(Key.Left)) move -= right;
+        if (_keys.Contains(Key.E)) move += new Vector3D(0, 1, 0);
+        if (_keys.Contains(Key.Q)) move -= new Vector3D(0, 1, 0);
+
+        if (move.LengthSquared <= 0) return;
+        move.Normalize();
+        _target += move * speed;
+        UpdateCamera();
+        UpdateGizmo();
+    }
+
+    private void OnViewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (IsPlaying) return;
+        if (e.Key is Key.W or Key.A or Key.S or Key.D or Key.Q or Key.E
+            or Key.Up or Key.Down or Key.Left or Key.Right)
+        {
+            _keys.Add(e.Key);
+            e.Handled = true;
+        }
+    }
+
+    private void OnViewKeyUp(object sender, KeyEventArgs e) => _keys.Remove(e.Key);
+
+    private void ApplyEnvironment()
+    {
+        var environment = _scene?.Environment ?? new EnvironmentSettings();
+        var ambient = ParseColor(environment.Ambient);
+        var ambientIntensity = Math.Clamp(environment.AmbientIntensity, 0, 3);
+
+        if (_scene is not null)
+        {
+            foreach (var volume in _scene.Objects.Where(item => item.Visible && item.Type == "GlobalVolume"))
+            {
+                var tint = ParseColor(volume.Color);
+                ambient = Blend(ambient, tint, Math.Clamp(0.35 * volume.Intensity, 0, 0.75));
+            }
+        }
+
+        ambient = ScaleColor(ambient, ambientIntensity);
+        var sun = ScaleColor(ParseColor(environment.SunColor), Math.Clamp(environment.SunIntensity, 0, 4));
+        var yaw = environment.SunYaw * Math.PI / 180.0;
+        var pitch = environment.SunPitch * Math.PI / 180.0;
+        var direction = new Vector3D(
+            Math.Cos(pitch) * Math.Sin(yaw),
+            Math.Sin(pitch),
+            Math.Cos(pitch) * Math.Cos(yaw));
+
+        var lights = new Model3DGroup();
+        lights.Children.Add(new AmbientLight(ambient));
+        lights.Children.Add(new DirectionalLight(sun, direction));
+        lights.Children.Add(new DirectionalLight(
+            ScaleColor(ParseColor("#6C5AA8"), 0.5), new Vector3D(-0.7, -0.25, -0.6)));
+        _lightsVisual.Content = lights;
+
+        var top = ParseColor(environment.BackgroundTop);
+        var bottom = ParseColor(environment.BackgroundBottom);
+        Background = new LinearGradientBrush(top, bottom, 90);
     }
 
     private void BuildGrid()
@@ -229,7 +567,7 @@ public sealed class Scene3DView : Grid
         _viewport.Children.Add(_gridVisual);
     }
 
-    private Material CreateMaterial(SceneObject item, bool selected)
+    private static Material CreateMaterial(SceneObject item, bool selected)
     {
         var color = ParseColor(item.Color);
         if (selected) color = Blend(color, AccentColor, 0.38);
@@ -238,17 +576,18 @@ public sealed class Scene3DView : Grid
         material.Children.Add(new DiffuseMaterial(new SolidColorBrush(color)));
         material.Children.Add(new SpecularMaterial(new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)), 24));
         if (selected)
-            material.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromArgb(56, AccentColor.R, AccentColor.G, AccentColor.B))));
+            material.Children.Add(new EmissiveMaterial(
+                new SolidColorBrush(Color.FromArgb(56, AccentColor.R, AccentColor.G, AccentColor.B))));
         return material;
     }
 
-    private static Transform3D CreateTransform(SceneObject item)
+    private static Transform3D CreateTransform(SceneObject item, double scaleMultiplier = 1, double heightFactor = 1)
     {
         var group = new Transform3DGroup();
         group.Children.Add(new ScaleTransform3D(
-            Value(item.Scale, 0, 1),
-            Value(item.Scale, 1, 1),
-            Value(item.Scale, 2, 1)));
+            Value(item.Scale, 0, 1) * scaleMultiplier,
+            Value(item.Scale, 1, 1) * scaleMultiplier * heightFactor,
+            Value(item.Scale, 2, 1) * scaleMultiplier));
 
         if (item.Rotation.Length >= 3)
         {
@@ -270,12 +609,26 @@ public sealed class Scene3DView : Grid
 
     private void OnMouseDown(object sender, MouseButtonEventArgs e)
     {
+        if (IsPlaying) return;
         Focus();
         _lastMouse = e.GetPosition(this);
 
-        if (e.ClickCount == 2)
+        if (e.ChangedButton == MouseButton.Left)
         {
-            ResetCamera();
+            var position = e.GetPosition(this);
+            if (TryBeginGizmoDrag(position)) return;
+
+            var hit = HitTestObject(position);
+            if (hit is not null)
+            {
+                _selectedId = hit.Id;
+                ObjectSelected?.Invoke(hit.Id);
+                UpdateGizmo();
+            }
+            else
+            {
+                ObjectSelected?.Invoke(null);
+            }
             return;
         }
 
@@ -291,16 +644,68 @@ public sealed class Scene3DView : Grid
         }
     }
 
+    private SceneObject? HitTestObject(Point point)
+    {
+        try
+        {
+            var result = VisualTreeHelper.HitTest(_viewport, point);
+            if (result is RayMeshGeometry3DHitTestResult ray && ray.ModelHit is GeometryModel3D model)
+            {
+                foreach (var pair in _hitModels)
+                {
+                    if (ReferenceEquals(pair.Value, model) ||
+                        (model.Geometry is MeshGeometry3D geometry && ReferenceEquals(geometry, FindMesh(pair.Value))))
+                        return _objects.TryGetValue(pair.Key, out var found) ? found : null;
+                }
+            }
+        }
+        catch
+        {
+            // Cai no teste por projeção abaixo.
+        }
+
+        SceneObject? best = null;
+        var bestDistance = 34.0;
+        foreach (var item in _objects.Values)
+        {
+            var screen = Project(new Point3D(item.X, item.Y, item.Z));
+            if (screen is null) continue;
+            var distance = (screen.Value - point).Length;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = item;
+            }
+        }
+        return best;
+    }
+
+    private static MeshGeometry3D? FindMesh(Model3D model) => model switch
+    {
+        GeometryModel3D geometry => geometry.Geometry as MeshGeometry3D,
+        Model3DGroup group => group.Children.Select(FindMesh).FirstOrDefault(mesh => mesh is not null),
+        _ => null
+    };
+
     private void OnMouseMove(object sender, MouseEventArgs e)
     {
         var current = e.GetPosition(this);
+
+        if (_draggingGizmo)
+        {
+            DragGizmo(current);
+            _lastMouse = current;
+            return;
+        }
+
         var delta = current - _lastMouse;
 
         if (_orbiting)
         {
             _yaw -= delta.X * 0.45;
-            _pitch = Math.Clamp(_pitch + delta.Y * 0.35, -5, 85);
+            _pitch = Math.Clamp(_pitch + delta.Y * 0.35, -85, 85);
             UpdateCamera();
+            UpdateGizmo();
         }
         else if (_panning)
         {
@@ -314,23 +719,106 @@ public sealed class Scene3DView : Grid
             var scale = _distance * 0.0016;
             _target += right * (-delta.X * scale) + up * (delta.Y * scale);
             UpdateCamera();
+            UpdateGizmo();
         }
 
         _lastMouse = current;
+    }
+
+    private bool TryBeginGizmoDrag(Point point)
+    {
+        if (_selectedId is null || !_objects.TryGetValue(_selectedId, out var item) || IsPlaying) return false;
+        var axis = _gizmo.HitTestAxis(point);
+        if (axis < 0) return false;
+
+        _draggingGizmo = true;
+        _dragAxis = axis;
+        _dragStartScreen = point;
+        _dragStartPosition = [item.X, item.Y, item.Z];
+        _dragUnitsPerPixel = ComputeUnitsPerPixel(item, axis);
+        CaptureMouse();
+        return true;
+    }
+
+    private double ComputeUnitsPerPixel(SceneObject item, int axis)
+    {
+        var origin = new Point3D(item.X, item.Y, item.Z);
+        var direction = axis switch
+        {
+            0 => new Vector3D(1, 0, 0),
+            1 => new Vector3D(0, 1, 0),
+            _ => new Vector3D(0, 0, 1)
+        };
+
+        var from = Project(origin);
+        var to = Project(origin + direction);
+        if (from is null || to is null) return 0.02;
+
+        var pixels = (to.Value - from.Value).Length;
+        return pixels < 2 ? 0.02 : 1.0 / pixels;
+    }
+
+    private void DragGizmo(Point current)
+    {
+        if (_selectedId is null || !_objects.TryGetValue(_selectedId, out var item)) return;
+        var origin = new Point3D(item.X, item.Y, item.Z);
+        var direction = _dragAxis switch
+        {
+            0 => new Vector3D(1, 0, 0),
+            1 => new Vector3D(0, 1, 0),
+            _ => new Vector3D(0, 0, 1)
+        };
+
+        var from = Project(origin);
+        var to = Project(origin + direction);
+        if (from is null || to is null)
+        {
+            _draggingGizmo = false;
+            return;
+        }
+
+        var axisScreen = to.Value - from.Value;
+        if (axisScreen.Length < 0.001)
+        {
+            _draggingGizmo = false;
+            return;
+        }
+        axisScreen.Normalize();
+
+        var mouseDelta = current - _dragStartScreen;
+        var projected = mouseDelta.X * axisScreen.X + mouseDelta.Y * axisScreen.Y;
+        var amount = projected * _dragUnitsPerPixel;
+
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            amount = Math.Round(amount * 4) / 4;
+        else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            amount = Math.Round(amount * 10) / 10;
+
+        var position = (double[])_dragStartPosition.Clone();
+        position[_dragAxis] = Math.Round(_dragStartPosition[_dragAxis] + amount, 4);
+        item.Position = position;
+
+        if (_visuals.TryGetValue(item.Id, out var visual))
+            visual.Transform = CreateTransform(item);
+
+        UpdateGizmo();
+        TransformChanged?.Invoke(item);
     }
 
     private void OnMouseUp(object sender, MouseButtonEventArgs e)
     {
         _orbiting = false;
         _panning = false;
+        _draggingGizmo = false;
         ReleaseMouseCapture();
     }
 
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
         _distance *= Math.Exp(-e.Delta / 620.0);
-        _distance = Math.Clamp(_distance, 2.5, 80);
+        _distance = Math.Clamp(_distance, 1.5, 220);
         UpdateCamera();
+        UpdateGizmo();
     }
 
     private void UpdateCamera()
@@ -348,14 +836,75 @@ public sealed class Scene3DView : Grid
         _camera.UpDirection = new Vector3D(0, 1, 0);
     }
 
+    private void UpdateGizmo()
+    {
+        if (_selectedId is null || IsPlaying || _scene is null ||
+            !_objects.TryGetValue(_selectedId, out var item))
+        {
+            _gizmo.Clear();
+            return;
+        }
+
+        var origin = new Point3D(item.X, item.Y, item.Z);
+        var originScreen = Project(origin);
+        if (originScreen is null)
+        {
+            _gizmo.Clear();
+            return;
+        }
+
+        var worldPerPixel = ComputeWorldPerPixel(origin);
+        var length = worldPerPixel * 86;
+        _gizmo.Show(originScreen.Value, Project(origin + new Vector3D(length, 0, 0)),
+            Project(origin + new Vector3D(0, length, 0)), Project(origin + new Vector3D(0, 0, length)));
+    }
+
+    private double ComputeWorldPerPixel(Point3D point)
+    {
+        var look = _camera.LookDirection;
+        look.Normalize();
+        var depth = Math.Max(0.4, Vector3D.DotProduct(point - _camera.Position, look));
+        var fov = _camera.FieldOfView * Math.PI / 180.0;
+        return 2 * depth * Math.Tan(fov / 2) / Math.Max(1, ActualHeight);
+    }
+
+    /// <summary>Projeta um ponto do mundo na tela do viewport.</summary>
+    public Point? Project(Point3D point)
+    {
+        var look = _camera.LookDirection;
+        look.Normalize();
+        var up = _camera.UpDirection;
+        up.Normalize();
+
+        var forward = look;
+        var right = Vector3D.CrossProduct(forward, up);
+        if (right.LengthSquared < 0.000001) return null;
+        right.Normalize();
+        var cameraUp = Vector3D.CrossProduct(right, forward);
+
+        var relative = point - _camera.Position;
+        var x = Vector3D.DotProduct(relative, right);
+        var y = Vector3D.DotProduct(relative, cameraUp);
+        var z = Vector3D.DotProduct(relative, forward);
+        if (z <= 0.05) return null;
+
+        var fov = _camera.FieldOfView * Math.PI / 180.0;
+        var aspect = ActualWidth / Math.Max(1.0, ActualHeight);
+        var factor = 1.0 / Math.Tan(fov / 2);
+        var ndcX = x * factor / aspect / z;
+        var ndcY = y * factor / z;
+
+        return new Point((ndcX + 1) * 0.5 * ActualWidth, (1 - ndcY) * 0.5 * ActualHeight);
+    }
+
     private static double Value(double[]? values, int index, double fallback) =>
         values is not null && index < values.Length ? values[index] : fallback;
 
-    private static Color ParseColor(string value)
+    private static Color ParseColor(string? value)
     {
         try
         {
-            return (Color)ColorConverter.ConvertFromString(value);
+            return (Color)ColorConverter.ConvertFromString(value ?? "");
         }
         catch
         {
@@ -367,6 +916,12 @@ public sealed class Scene3DView : Grid
     {
         byte Mix(byte a, byte b) => (byte)Math.Clamp(a + (b - a) * amount, 0, 255);
         return Color.FromRgb(Mix(first.R, second.R), Mix(first.G, second.G), Mix(first.B, second.B));
+    }
+
+    private static Color ScaleColor(Color color, double factor)
+    {
+        byte Scale(byte value) => (byte)Math.Clamp(value * factor, 0, 255);
+        return Color.FromRgb(Scale(color.R), Scale(color.G), Scale(color.B));
     }
 
     private static MeshGeometry3D CreateBoxMesh()
@@ -444,5 +999,108 @@ public sealed class Scene3DView : Grid
 
         mesh.Freeze();
         return mesh;
+    }
+
+    private sealed record AnimationState(string? Clip, double Speed, bool Loop, double Time);
+
+    /// <summary>Desenha as setas coloridas do gizmo de translação por cima do viewport.</summary>
+    private sealed class GizmoLayer : FrameworkElement
+    {
+        private Point _origin;
+        private readonly Point?[] _ends = new Point?[3];
+        private bool _visible;
+
+        public void Clear()
+        {
+            _visible = false;
+            InvalidateVisual();
+        }
+
+        public void Show(Point origin, Point? x, Point? y, Point? z)
+        {
+            _origin = origin;
+            _ends[0] = x;
+            _ends[1] = y;
+            _ends[2] = z;
+            _visible = true;
+            InvalidateVisual();
+        }
+
+        public int HitTestAxis(Point point)
+        {
+            if (!_visible) return -1;
+            var best = -1;
+            var bestDistance = 12.0;
+            for (var axis = 0; axis < 3; axis++)
+            {
+                if (_ends[axis] is not { } end) continue;
+                var distance = DistanceToSegment(point, _origin, end);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = axis;
+                }
+            }
+            return best;
+        }
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            base.OnRender(dc);
+            if (!_visible) return;
+
+            for (var axis = 0; axis < 3; axis++)
+            {
+                if (_ends[axis] is not { } end) continue;
+                var color = axis switch
+                {
+                    0 => AxisXColor,
+                    1 => AxisYColor,
+                    _ => AxisZColor
+                };
+                var pen = new Pen(new SolidColorBrush(color), 3.2);
+                pen.Freeze();
+                dc.DrawLine(pen, _origin, end);
+
+                var direction = end - _origin;
+                if (direction.Length < 1) continue;
+                direction.Normalize();
+                var normal = new Vector(-direction.Y, direction.X);
+
+                var tip = end;
+                var leftPoint = end - direction * 11 + normal * 5;
+                var rightPoint = end - direction * 11 - normal * 5;
+                var brush = new SolidColorBrush(color);
+                brush.Freeze();
+                var triangle = new StreamGeometry();
+                using (var context = triangle.Open())
+                {
+                    context.BeginFigure(tip, true, true);
+                    context.LineTo(leftPoint, true, false);
+                    context.LineTo(rightPoint, true, false);
+                }
+                triangle.Freeze();
+                dc.DrawGeometry(brush, null, triangle);
+
+                var label = new FormattedText(axis switch { 0 => "X", 1 => "Y", _ => "Z" },
+                    System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    new Typeface("Segoe UI"), 10, brush, 1.0);
+                dc.DrawText(label, new Point(end.X + 6, end.Y - 7));
+            }
+
+            var centerBrush = new SolidColorBrush(Color.FromArgb(220, 244, 241, 255));
+            centerBrush.Freeze();
+            dc.DrawEllipse(centerBrush, null, _origin, 4, 4);
+        }
+
+        private static double DistanceToSegment(Point point, Point start, Point end)
+        {
+            var direction = end - start;
+            var lengthSquared = direction.LengthSquared;
+            if (lengthSquared < 0.0001) return (point - start).Length;
+            var t = Math.Clamp(((point - start).X * direction.X + (point - start).Y * direction.Y) / lengthSquared, 0, 1);
+            var closest = start + direction * t;
+            return (point - closest).Length;
+        }
     }
 }

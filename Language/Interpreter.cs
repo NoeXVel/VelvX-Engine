@@ -23,6 +23,8 @@ public sealed class Interpreter
 
     public void SetDeltaTime(double value) => _game.Set("delta_time", value);
 
+    public bool HasFunction(string name) => _functions.ContainsKey(name);
+
     public void Load(ProgramNode program)
     {
         foreach (var function in program.Statements.OfType<FunctionDeclStmt>())
@@ -70,6 +72,8 @@ public sealed class Interpreter
 
         _game.Set("get_input_vectors", new NativeFunction("get_input_vectors", arguments =>
             _host.GetInputVectors(arguments.Select(ToDisplayString).ToList())));
+        _game.Set("get_input", new NativeFunction("get_input", arguments =>
+            arguments.Count > 0 && _host.IsActionDown(ToDisplayString(arguments[0]))));
         _game.Set("delta_time", 0.0);
         _globals.Define("game", _game);
 
@@ -80,8 +84,13 @@ public sealed class Interpreter
             var wrapper = new ScriptObject("Cena", "Scene");
             wrapper.Set("object", root);
             wrapper.Set("name", root.Name);
+            wrapper.Set("load", new NativeFunction("load", _ => _host.LoadScene(name)));
+            wrapper.Set("unload", new NativeFunction("unload", _ => _host.UnloadScene(name)));
+            wrapper.Set("set_active", new NativeFunction("set_active", _ => _host.SetActiveScene(name)));
+            wrapper.Set("is_loaded", new NativeFunction("is_loaded", _ => _host.IsSceneLoaded(name)));
             return wrapper;
         }));
+        _globals.Define("Scenes", _host.SceneManager);
 
         var assets = new ScriptObject("Assets", "Assets");
         assets.Set("pathObject", new NativeFunction("pathObject", arguments =>

@@ -1,0 +1,225 @@
+<Window x:Class="VelvX.Engine.Windows.ProjectSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Configurações do projeto"
+        Width="780" Height="640" MinWidth="700" MinHeight="540"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource EditorBg}"
+        Foreground="{StaticResource Text}"
+        FontFamily="Segoe UI"
+        UseLayoutRounding="True">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="58" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="58" />
+    </Grid.RowDefinitions>
+
+    <Border Background="#11131A" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
+      <StackPanel Margin="22,0" VerticalAlignment="Center">
+        <TextBlock Text="CONFIGURAÇÕES DO PROJETO" FontSize="14" FontWeight="SemiBold" />
+        <TextBlock x:Name="ProjectLabel" Text="" FontSize="10" Foreground="#8A8E9E" Margin="0,3,0,0" />
+      </StackPanel>
+    </Border>
+
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="196" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <Border Background="{StaticResource PanelDeep}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
+        <StackPanel Margin="12,14">
+          <TextBlock Text="SEÇÕES" Style="{StaticResource SectionLabel}" />
+          <Button x:Name="NavGeneral" Style="{StaticResource NavButtonActive}" Content="Geral" Click="Nav_Click" Tag="general" />
+          <Button x:Name="NavInputs" Style="{StaticResource NavButton}" Content="Entradas" Click="Nav_Click" Tag="inputs" />
+          <Button x:Name="NavRender" Style="{StaticResource NavButton}" Content="Renderização e FPS" Click="Nav_Click" Tag="render" />
+          <Button x:Name="NavEnvironment" Style="{StaticResource NavButton}" Content="Iluminação e volumes" Click="Nav_Click" Tag="environment" />
+          <Button x:Name="NavScenes" Style="{StaticResource NavButton}" Content="Cenas e streaming" Click="Nav_Click" Tag="scenes" />
+          <Border Height="1" Background="{StaticResource Line}" Margin="0,12" />
+          <TextBlock Text="As mudanças são gravadas no arquivo do projeto e na cena atual." FontSize="9.5" Foreground="#6F7382" TextWrapping="Wrap" LineHeight="14" />
+        </StackPanel>
+      </Border>
+
+      <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="24,18">
+        <Grid>
+          <!-- Geral -->
+          <StackPanel x:Name="PanelGeneral">
+            <TextBlock Text="GERAL" Style="{StaticResource SectionLabel}" />
+            <TextBlock Text="NOME DO PROJETO" Style="{StaticResource FieldLabel}" />
+            <TextBox x:Name="NameBox" Margin="0,0,0,14" />
+            <TextBlock Text="MODO" Style="{StaticResource FieldLabel}" />
+            <Border Background="#12141A" BorderBrush="#2E323E" BorderThickness="1" CornerRadius="7" Padding="11,8" Margin="0,0,0,14">
+              <TextBlock x:Name="ModeLabel" Text="3D" Foreground="#B9B2CE" FontSize="12" />
+            </Border>
+            <TextBlock Text="PASTA" Style="{StaticResource FieldLabel}" />
+            <Border Background="#12141A" BorderBrush="#2E323E" BorderThickness="1" CornerRadius="7" Padding="11,8" Margin="0,0,0,14">
+              <TextBlock x:Name="FolderLabel" Foreground="#A9A4BD" FontSize="11" TextWrapping="Wrap" />
+            </Border>
+            <TextBlock Text="MOTOR" Style="{StaticResource FieldLabel}" />
+            <Border Background="#12141A" BorderBrush="#2E323E" BorderThickness="1" CornerRadius="7" Padding="11,8">
+              <TextBlock x:Name="EngineLabel" Foreground="#A9A4BD" FontSize="11" />
+            </Border>
+            <Border Background="#171A22" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="9" Padding="12,10" Margin="0,18,0,0">
+              <TextBlock Text="Renomear o projeto não move a pasta no disco. Para trocar o modo 2D/3D, crie um projeto novo pelo launcher." FontSize="10" Foreground="#9A9EAD" TextWrapping="Wrap" LineHeight="15" />
+            </Border>
+          </StackPanel>
+
+          <!-- Entradas -->
+          <StackPanel x:Name="PanelInputs" Visibility="Collapsed">
+            <TextBlock Text="ENTRADAS PERSONALIZADAS" Style="{StaticResource SectionLabel}" />
+            <TextBlock Text="Crie ações com o nome que você quiser e use nos scripts com game.get_input(&quot;nome&quot;)." FontSize="10.5" Foreground="#9A9EAD" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="218" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+
+              <StackPanel>
+                <ListBox x:Name="InputList" Height="330" SelectionChanged="InputList_SelectionChanged" DisplayMemberPath="Name" />
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                  <Button Style="{StaticResource GhostButton}" Content="+ Adicionar" Padding="10,6" FontSize="11" Click="AddInput_Click" />
+                  <Button Style="{StaticResource GhostButton}" Content="Remover" Padding="10,6" FontSize="11" Click="RemoveInput_Click" Margin="6,0,0,0" />
+                </StackPanel>
+              </StackPanel>
+
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="NOME DA AÇÃO" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="ActionNameBox" Margin="0,0,0,12" TextChanged="ActionName_TextChanged" />
+                <TextBlock Text="TECLAS (SEPARE POR VÍRGULA)" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="ActionKeysBox" Margin="0,0,0,8" TextChanged="ActionKeys_TextChanged" />
+                <TextBlock Text="Exemplos: W, Space, LeftShift, Up, F1, E." FontSize="9.5" Foreground="#737888" TextWrapping="Wrap" Margin="0,0,0,14" />
+                <Border Background="#171A22" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="9" Padding="12,10">
+                  <StackPanel>
+                    <TextBlock Text="USO NO SCRIPT" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,6" />
+                    <TextBlock Text="if game.get_input(&quot;pular&quot;) { ... }" FontFamily="Cascadia Mono, Consolas" FontSize="10.5" Foreground="#D8D4E4" />
+                    <TextBlock Text="var v = game.get_input_vectors(&quot;mover_esquerda&quot;, &quot;mover_direita&quot;, &quot;mover_cima&quot;, &quot;mover_baixo&quot;)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" TextWrapping="Wrap" Margin="0,6,0,0" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+
+          <!-- Render -->
+          <StackPanel x:Name="PanelRender" Visibility="Collapsed">
+            <TextBlock Text="RENDERIZAÇÃO E DESEMPENHO" Style="{StaticResource SectionLabel}" />
+            <TextBlock Text="LIMITE DE FPS (0 = ILIMITADO)" Style="{StaticResource FieldLabel}" />
+            <TextBox x:Name="FpsLimitBox" Width="160" HorizontalAlignment="Left" Margin="0,0,0,14" />
+            <CheckBox x:Name="ShowFpsCheck" Content="Mostrar contador de FPS durante a execução" Margin="0,0,0,10" />
+            <CheckBox x:Name="SmoothCheck" Content="Sombreamento suave em modelos e primitivas" Margin="0,0,0,18" />
+            <Border Background="#171A22" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="9" Padding="12,10">
+              <StackPanel>
+                <TextBlock Text="OTIMIZADO PARA PC MODESTO" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,6" />
+                <TextBlock Text="60 FPS é o equilíbrio recomendado para GTX 1650 e 8 GB de RAM. Use 30 FPS em cenas pesadas e 0 apenas para testes. O editor reduz o custo de animação quando a janela não está em execução." FontSize="10" Foreground="#9A9EAD" TextWrapping="Wrap" LineHeight="15" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <!-- Ambiente -->
+          <StackPanel x:Name="PanelEnvironment" Visibility="Collapsed">
+            <TextBlock Text="ILUMINAÇÃO DA CENA ATUAL" Style="{StaticResource SectionLabel}" />
+            <TextBlock Text="A luz ambiente e o sol valem para a cena aberta. Um objeto Global Volume tinge a iluminação; Box Volume demarca uma área de efeito visual." FontSize="10.5" Foreground="#9A9EAD" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="COR AMBIENTE" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="AmbientBox" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="INTENSIDADE AMBIENTE" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="AmbientIntensityBox" />
+              </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="COR DO SOL" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="SunColorBox" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="INTENSIDADE DO SOL" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="SunIntensityBox" />
+              </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="DIREÇÃO YAW" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="SunYawBox" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="DIREÇÃO PITCH" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="SunPitchBox" />
+              </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,0,0,14">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="FUNDO SUPERIOR" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="BackgroundTopBox" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="FUNDO INFERIOR" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="BackgroundBottomBox" />
+              </StackPanel>
+            </Grid>
+
+            <TextBlock Text="PRESETS" Style="{StaticResource FieldLabel}" />
+            <StackPanel Orientation="Horizontal">
+              <Button Style="{StaticResource GhostButton}" Content="Estúdio" Padding="11,7" FontSize="11" Click="Preset_Click" Tag="studio" />
+              <Button Style="{StaticResource GhostButton}" Content="Dia claro" Padding="11,7" FontSize="11" Click="Preset_Click" Tag="day" Margin="6,0,0,0" />
+              <Button Style="{StaticResource GhostButton}" Content="Noite neon" Padding="11,7" FontSize="11" Click="Preset_Click" Tag="neon" Margin="6,0,0,0" />
+              <Button Style="{StaticResource GhostButton}" Content="Neblina" Padding="11,7" FontSize="11" Click="Preset_Click" Tag="fog" Margin="6,0,0,0" />
+            </StackPanel>
+          </StackPanel>
+
+          <!-- Cenas -->
+          <StackPanel x:Name="PanelScenes" Visibility="Collapsed">
+            <TextBlock Text="CENAS E STREAMING" Style="{StaticResource SectionLabel}" />
+            <TextBlock Text="A cena inicial abre ao executar. Durante o jogo use Scene(&quot;Fase 2&quot;).load() e unload() para streaming de nível." FontSize="10.5" Foreground="#9A9EAD" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <ListBox x:Name="SceneList" Height="250" SelectionChanged="SceneList_SelectionChanged" DisplayMemberPath="Name" />
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,12">
+              <Button Style="{StaticResource GhostButton}" Content="+ Nova cena" Padding="10,6" FontSize="11" Click="AddScene_Click" />
+              <Button Style="{StaticResource GhostButton}" Content="Remover da lista" Padding="10,6" FontSize="11" Click="RemoveScene_Click" Margin="6,0,0,0" />
+              <Button Style="{StaticResource GhostButton}" Content="Definir como inicial" Padding="10,6" FontSize="11" Click="SetStartScene_Click" Margin="6,0,0,0" />
+            </StackPanel>
+            <Border Background="#171A22" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="9" Padding="12,10">
+              <TextBlock x:Name="SceneHint" Text="Selecione uma cena para ver o caminho." FontSize="10" Foreground="#9A9EAD" TextWrapping="Wrap" LineHeight="15" />
+            </Border>
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
+    </Grid>
+
+    <Border Grid.Row="2" Background="#101218" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0">
+      <DockPanel Margin="20,0">
+        <TextBlock x:Name="StatusLabel" Text="" VerticalAlignment="Center" FontSize="10" Foreground="#FBBF24" />
+        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+          <Button Style="{StaticResource GhostButton}" Content="Cancelar" Click="Cancel_Click" Margin="0,0,8,0" />
+          <Button Style="{StaticResource PrimaryButton}" Content="Salvar configurações" Click="Save_Click" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+  </Grid>
+</Window>

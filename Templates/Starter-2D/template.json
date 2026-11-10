@@ -1,8 +1,8 @@
 {
   "id": "starter-2d",
   "name": "Projeto 2D",
-  "description": "Cena 2D com fundo, plataforma, orbe e um Player com movimento por WASD.",
+  "description": "Cena 2D com fundo, plataforma, sprites, GIF animado, prefab e streaming para a Floresta.",
   "mode": "2D",
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
 

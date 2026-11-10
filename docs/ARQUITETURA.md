@@ -1,6 +1,6 @@
 # Arquitetura da VelvX Engine
 
-Este documento descreve como a versão **0.1.0 (Fundação)** está organizada e quais são os pontos de extensão para as próximas etapas.
+Este documento descreve como a versão **0.2.0 (Forja)** está organizada e quais são os pontos de extensão para as próximas etapas.
 
 ## Visão geral
 
@@ -12,21 +12,33 @@ Launcher (MainWindow)
            │
            ▼
 Editor (EditorWindow)
-  ├─ Hierarquia      lista de objetos da cena
-  ├─ Viewport 3D     WPF Viewport3D + câmera orbital
-  ├─ Viewport 2D     desenho vetorial em FrameworkElement.OnRender
-  ├─ Inspector       nome, posição, escala, cor, script
-  ├─ Script          editor .velv com números de linha
+  ├─ Hierarquia      objetos, cenas carregadas, busca e criação
+  ├─ Viewport 3D     WPF Viewport3D, câmera orbital + WASD, gizmos
+  ├─ Viewport 2D     desenho vetorial, sprites, GIFs e spritesheets
+  ├─ Inspector       transformação, aparência, assets, luz, volume,
+  │                  componentes e script do objeto
+  ├─ Script          AvalonEdit + realce da VelvX + ajuda
+  ├─ Recursos        cenas, scripts, assets e prefabs
   └─ Saída           console do jogo + FPS
+           │
+           ▼
+Configurações do Projeto (ProjectSettingsWindow)
+  ├─ Geral           nome, modo, pasta, motor
+  ├─ Entradas        ações e teclas personalizadas
+  ├─ Renderização    limite de FPS, contador, sombreamento
+  ├─ Iluminação      ambiente, sol, fundo, neblina
+  └─ Cenas           lista de cenas e streaming
            │
            ▼
 Runtime (GameSession)
   ├─ Parser / Interpreter da VelvX
-  ├─ InputState (WASD + setas)
+  ├─ InputState + InputMap do projeto
+  ├─ SceneManager    cenas carregadas, ativa, load/unload/set_active
+  ├─ Componentes     scripts por objeto e Rotator/PointLight nativos
   └─ ponte cena ↔ objetos de script
 ```
 
-A Engine é um aplicativo WPF .NET 8 para Windows, sem dependências externas de runtime. A build portátil é autossuficiente (`win-x64`).
+A Engine é um aplicativo WPF .NET 8 para Windows. A build portátil é autossuficiente (`win-x64`) e não exige .NET instalado. Modelos 3D usam **AssimpNet** (Assimp nativo) e o editor de script usa **AvalonEdit**.
 
 ## Projetos
 
@@ -34,24 +46,50 @@ Um projeto é uma pasta com:
 
 ```
 MeuJogo/
-├─ MeuJogo.velvxproj        metadados (nome, modo, cena inicial, script de entrada)
+├─ MeuJogo.velvxproj        metadados, inputs, render e cenas
 ├─ Scenes/
-│  └─ Main.scene.json       cena editável
-└─ Scripts/
-   └─ Main.velv             ponto de entrada da VelvX
+│  ├─ Main.scene.json
+│  └─ Arena.scene.json
+├─ Scripts/
+│  ├─ Main.velv
+│  └─ ComponenteExemplo.velv
+├─ Prefabs/
+│  └─ Estrela.prefab.json
+└─ Assets/
+   ├─ Audio/
+   ├─ Models/
+   ├─ Sprites/
+   └─ Textures/
 ```
 
-O arquivo do projeto segue o nome da pasta (`<Nome>.velvxproj`). Os caminhos de cena e script são relativos à pasta do projeto e podem ser trocados no inspector/metadados.
+O arquivo do projeto segue o nome da pasta (`<Nome>.velvxproj`). Caminhos de cena, script e assets são relativos à pasta do projeto.
+
+O `.velvxproj` guarda:
+
+- `name`, `mode` (`2D`/`3D`), `language`, `createdAt`, `template`;
+- `entryScript` e `startScene`;
+- `scenes`: entradas `{ name, path, start }`;
+- `inputs.actions`: `{ name, keys[] }`;
+- `render`: `fpsLimit`, `showFps`, `smoothShading`.
 
 Lista de recentes: `%LOCALAPPDATA%\VelvX\recent-projects.json`.
 Projetos novos por padrão: `%USERPROFILE%\Documents\VelvX Projects`.
 
 ### Formato da cena
 
-Cada objeto tem `id`, `name`, `type`, `position`, `rotation`, `scale`, `color` e, opcionalmente, `script` (2D também usa `size`). Tipos renderizados hoje:
+Cada cena tem `name`, `mode`, `environment` e `objects`. Cada objeto tem `id`, `name`, `type`, `position`, `rotation`, `scale`, `color` e, opcionalmente:
 
-- 3D: `Box` (qualquer tipo diferente de `Sphere`), `Sphere`, `CharacterBody3D`, além de `DirectionalLight`/câmeras (ignorados na renderização atual).
-- 2D: `Ellipse` desenha uma elipse; os demais tipos desenham um retângulo arredondado com `size`.
+- `size` (2D);
+- `script` (script do objeto);
+- `model`, `animation`, `animationSpeed`, `animationLoop` (Model3D);
+- `sprite` (path, columns, rows, fps, loop);
+- `intensity`, `range` (luzes e volumes);
+- `components`: lista de `{ type, ... }` com `Enabled`, `Color`, `Amount`, `Range`, `Axis`, `Speed`, `Script`, etc.
+
+Tipos principais:
+
+- 3D: `Box`, `Sphere`, `Model3D`, `CharacterBody3D`, `PointLight`, `DirectionalLight`, `GlobalVolume`, `BoxVolume`, `Camera3D`.
+- 2D: `Rectangle`, `Ellipse`, `Sprite`, `CharacterBody2D`, `GlobalVolume`, `BoxVolume`, `Camera2D`.
 
 ## Templates
 
@@ -74,25 +112,43 @@ Valores em tempo de execução: `null`, `bool`, `double`, `string`, `VelvVector2
 
 Limites de proteção: profundidade de chamadas 64; laços `while` até 500.000 iterações por execução.
 
-### Ponte cena ↔ script
+O realce de sintaxe fica em `Language/VelvXHighlighting.cs` (definição XSHD embutida, carregada no AvalonEdit).
 
-`GameSession` cria um `ScriptObject` para cada objeto da cena, espelhando `position`, `rotation`, `scale`, `visible` e o componente `CharacterBody3D`/`CharacterBody2D`. A cada quadro:
+## Ponte cena ↔ script
+
+`GameSession` cria um `ScriptObject` para cada objeto da cena, espelhando `position`, `rotation`, `scale`, `visible`, o componente `CharacterBody3D`/`CharacterBody2D` e os componentes declarados. A cada quadro:
 
 1. tira um snapshot das posições;
-2. executa `InGame()`;
-3. integra a `velocity` do componente do jogador quando a posição não foi alterada manualmente;
-4. aplica as posições de volta aos objetos da cena e dispara `SceneObjectChanged` para o editor atualizar viewport e inspector.
+2. executa `InGame()` e os scripts de componente;
+3. integra a `velocity` do jogador quando a posição não foi alterada manualmente;
+4. aplica posições de volta aos objetos e dispara `SceneObjectChanged` para o editor;
+5. executa componentes nativos (como o `Rotator`) e atualiza o gerenciador de cenas.
 
 O jogador é o objeto cujo `script` é o `EntryScript` do projeto; se não houver, o primeiro `CharacterBody`; se não houver, o primeiro objeto.
+
+## Cenas e streaming
+
+`GameSession` mantém um dicionário de cenas carregadas:
+
+- `Scene("Nome")` devolve um wrapper com `load()`, `unload()`, `set_active()` e `is_loaded()`;
+- a cena ativa é a que recebe `Scene(nomeSemArgumento).object` e os scripts;
+- `LoadScene` resolve o caminho pelo nome da cena no projeto, pelo arquivo em `Scenes/` ou por um caminho relativo;
+- cenas carregadas continuam sendo atualizadas e aparecem em `Cenas carregadas` na hierarquia;
+- descarregar remove os objetos e os scripts daquela cena.
 
 ## Editor
 
 - O modo Play clona a cena antes de executar e restaura o clone ao parar, então o jogo nunca altera a cena salva.
-- O laço roda em um `DispatcherTimer` de ~15 ms; `game.delta_time` é limitado a 0,1 s para evitar saltos.
-- Input: `Window.PreviewKeyDown/Up` alimenta `InputState`; ao entrar em Play o foco vai para o viewport ativo para que WASD/setas funcionem sem clique.
-- Câmera 3D: órbita com botão direito, pan com botão do meio, zoom com scroll, duplo clique ou botão de reset. FOV 55°, câmera inicial a 18 unidades.
-- A grade do editor é desenhada em geometria 3D e fica sob os objetos; o piso do template pode cobri-la, como em qualquer editor de cena.
-- 2D: clique esquerdo seleciona, botão direito/meio move (pan) e scroll dá zoom; o viewport mostra grade e destaque do objeto selecionado.
+- O laço roda em um `DispatcherTimer` no intervalo do limite de FPS; `game.delta_time` é limitado a 0,1 s para evitar saltos.
+- Input: `Window.PreviewKeyDown/Up` alimenta `InputState`; durante o Play qualquer tecla é encaminhada ao jogo e `Esc` encerra.
+- Câmera 3D: órbita com botão direito, pan com o botão do meio, zoom com scroll, `WASD`/setas para mover, `E`/`Q` para subir/descer, `Shift` para acelerar, `F` ou **Focar** para centralizar no objeto.
+- Gizmos: projeção dos eixos X/Y/Z para a tela, teste de acerto por segmento e arraste convertido em unidades por pixel. `Ctrl`/`Shift` aplicam snap.
+- 2D: clique esquerdo seleciona, setas X/Y movem o objeto, botão direito/meio move a vista e scroll dá zoom; sprites, GIFs e spritesheets são desenhados com `CroppedBitmap`.
+- Recursos: a árvore é montada a partir das pastas do projeto; arrastar um objeto para `Prefabs` grava um `.prefab.json` e arrastar o prefab para a cena cria uma cópia.
+
+## Renderização 3D
+
+`Rendering/ModelLoader.cs` usa Assimp para importar OBJ/FBX/GLTF/GLB, monta materiais com texturas, aplica skinning por CPU e amostra animações de nós/esqueleto por tempo. O `Scene3DView` converte modelos e formas primitivas em `ModelVisual3D`, aplica o ambiente da cena (`EnvironmentSettings`), mistura o tom do `GlobalVolume`, adiciona luzes pontuais de objetos/componentes e anima o componente `Rotator` no editor.
 
 ## Execução headless
 
@@ -103,7 +159,7 @@ VelvX.Engine.exe --run-script Scripts\Main.velv --frames 60
 VelvX.Engine.exe --run-script Scripts\Main.velv --scene Scenes\Main.scene.json --mode 2D --out resultado.txt
 ```
 
-O código de saída é `0` em sucesso e `1` em erro. Sem `--scene`, é criada uma cena padrão mínima no modo indicado (`3D` por padrão).
+O código de saída é `0` em sucesso e `1` em erro. Sem `--scene`, é criada uma cena padrão mínima no modo indicado. O executor procura o `.velvxproj` do projeto para usar Inputs e caminhos de assets.
 
 ## Build e distribuição
 
@@ -113,8 +169,8 @@ O código de saída é `0` em sucesso e `1` em erro. Sem `--scene`, é criada um
 
 1. Exportação de jogo independente (executável do jogo sem o editor).
 2. Física e colisão para `CharacterBody2D/3D` e corpos rígidos.
-3. Áudio, animação e tilemaps.
-4. Editor de assets (texturas, sprites, materiais) e câmera de jogo.
+3. Áudio, animação com blending e tilemaps.
+4. Editor de assets (materiais, atlas, animação) e câmera de jogo.
 5. Compilador VelvX para bytecode, com diagnóstico mais rico.
 6. Sistema de pacotes/projetos e builds incrementais.
 7. CI no GitHub Actions para compilar e anexar o zip automaticamente a cada release.

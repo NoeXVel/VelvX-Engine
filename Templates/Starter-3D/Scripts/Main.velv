@@ -5,11 +5,20 @@
 func Main()
 {
     console.show("VelvX 3D pronta. Use WASD ou as setas para mover o Player.");
+    console.show("Pressione E para carregar a Arena por streaming.");
 }
 
 func InGame()
 {
     ## Ordem dos argumentos: positivo X, negativo X, positivo Y, negativo Y.
-    var direcao = game.get_input_vectors("direita", "esquerda", "baixo", "cima");
+    ## Os nomes abaixo são ações do projeto — edite em Projeto > Configurações > Entradas.
+    var direcao = game.get_input_vectors("mover_direita", "mover_esquerda", "mover_baixo", "mover_cima");
     this.CharacterBody3D.velocity = new.Vector3(direcao.x * 6, 0, direcao.y * 6);
+
+    ## Streaming de nível: carrega a cena Arena uma única vez.
+    if game.get_input("interagir") and not Scene("Arena").is_loaded()
+    {
+        Scene("Arena").load();
+        console.show("Arena carregada por streaming.");
+    }
 }

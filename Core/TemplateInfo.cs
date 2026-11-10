@@ -10,7 +10,7 @@ public sealed class TemplateInfo
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     public string Mode { get; set; } = "2D";
-    public string Version { get; set; } = "0.1.0";
+    public string Version { get; set; } = "0.2.0";
 
     [JsonIgnore] public string FolderPath { get; set; } = "";
     [JsonIgnore] public string Glyph => Is3D ? "◈" : "▤";
@@ -87,16 +87,40 @@ public static class TemplateService
             Info = new ProjectInfo
             {
                 Name = projectName,
-                Version = "0.1.0",
+                Version = "0.2.0",
                 Template = template.Id,
                 Mode = template.Is3D ? "3D" : "2D",
                 Language = EnginePaths.Language,
                 EntryScript = "Scripts/Main.velv",
                 StartScene = "Scenes/Main.scene.json",
                 EngineVersion = EnginePaths.Version,
-                CreatedAt = DateTime.Now
+                CreatedAt = DateTime.Now,
+                Inputs = InputMap.CreateDefault()
             }
         };
+
+        project.EnsureLayout();
+        foreach (var sceneFile in Directory.EnumerateFiles(
+                     Path.Combine(projectFolder, "Scenes"), "*.scene.json", SearchOption.TopDirectoryOnly))
+        {
+            var name = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(sceneFile));
+            project.Info.Scenes.Add(new SceneEntry
+            {
+                Name = name,
+                Path = $"Scenes/{Path.GetFileName(sceneFile)}",
+                Start = string.Equals(Path.GetFileName(sceneFile), "Main.scene.json", StringComparison.OrdinalIgnoreCase)
+            });
+        }
+
+        if (project.Info.Scenes.Count == 0)
+        {
+            project.Info.Scenes.Add(new SceneEntry
+            {
+                Name = "Main",
+                Path = "Scenes/Main.scene.json",
+                Start = true
+            });
+        }
 
         project.Save();
         RecentProjects.Add(project);
