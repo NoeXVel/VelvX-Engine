@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using VelvX.Engine.Core;
@@ -51,6 +52,7 @@ public sealed class Scene3DView : Grid
 
     private SceneDocument? _scene;
     private string? _selectedId;
+    private SceneObject? _gameCamera;
     private Point _lastMouse;
     private bool _orbiting;
     private bool _panning;
@@ -131,11 +133,15 @@ public sealed class Scene3DView : Grid
             return;
         }
 
-        if (item.Type == "Model3D" && !string.IsNullOrWhiteSpace(item.Model))
+        if (item.Type == "Model3D" && !string.IsNullOrWhiteSpace(item.Model) ||
+            item.GetComponent("MeshRenderer") is { Enabled: true })
         {
             // O modelo pode ter sido importado/trocado depois da criação do visual.
+            var modelPath = GetModelPath(item);
+            var texture = ResolveAsset?.Invoke(item.ModelTexture ?? "") ?? item.ModelTexture ?? "";
+            var wanted = (ResolveAsset?.Invoke(modelPath ?? "") ?? modelPath ?? "") + "|" + texture;
             if (!_visualModelPaths.TryGetValue(item.Id, out var current) ||
-                !string.Equals(current, item.Model, StringComparison.OrdinalIgnoreCase))
+                !string.Equals(current, wanted, StringComparison.OrdinalIgnoreCase))
             {
                 Rebuild();
                 UpdateGizmo();
@@ -178,7 +184,52 @@ public sealed class Scene3DView : Grid
     {
         IsPlaying = playing;
         if (playing) _keys.Clear();
+        UpdateGridVisibility();
+        if (!playing)
+        {
+            _gameCamera = null;
+            _camera.FieldOfView = 55;
+            UpdateCamera();
+        }
+        Rebuild();
         UpdateGizmo();
+    }
+
+    /// <summary>Define a câmera do jogo. Null mantém a câmera livre do editor.</summary>
+    public void SetGameCamera(SceneObject? camera)
+    {
+        _gameCamera = camera;
+        UpdateGameCamera();
+    }
+
+    private void UpdateGridVisibility()
+    {
+        var attached = _viewport.Children.Contains(_gridVisual);
+        if (IsPlaying && attached)
+            _viewport.Children.Remove(_gridVisual);
+        else if (!IsPlaying && !attached)
+            _viewport.Children.Insert(0, _gridVisual);
+    }
+
+    private void UpdateGameCamera()
+    {
+        if (!IsPlaying || _gameCamera is null) return;
+
+        var cameraComponent = _gameCamera.GetCameraComponent();
+        var fov = cameraComponent?.Fov ?? _gameCamera.Fov;
+        _camera.FieldOfView = Math.Clamp(fov is > 1 and < 179 ? fov : 55, 10, 170);
+        _camera.NearPlaneDistance = Math.Max(0.01, cameraComponent?.NearPlane ?? _gameCamera.NearPlane);
+        _camera.FarPlaneDistance = Math.Max(1, cameraComponent?.FarPlane ?? _gameCamera.FarPlane);
+        _camera.Position = new Point3D(_gameCamera.X, _gameCamera.Y, _gameCamera.Z);
+
+        var pitch = Value(_gameCamera.Rotation, 0, 0) * Math.PI / 180.0;
+        var yaw = Value(_gameCamera.Rotation, 1, 0) * Math.PI / 180.0;
+        var direction = new Vector3D(
+            -Math.Cos(pitch) * Math.Sin(yaw),
+            Math.Sin(pitch),
+            -Math.Cos(pitch) * Math.Cos(yaw));
+        _camera.LookDirection = direction;
+        _camera.UpDirection = new Vector3D(0, 1, 0);
     }
 
     private bool IsSelected(SceneObject item) =>
@@ -202,13 +253,13 @@ public sealed class Scene3DView : Grid
 
             if (item.Type is "GlobalVolume")
             {
-                BuildGlobalVolumeMarker(item);
+                if (!IsPlaying) BuildGlobalVolumeMarker(item);
                 continue;
             }
 
             if (item.IsVolume)
             {
-                BuildVolume(item);
+                if (!IsPlaying) BuildVolume(item);
                 continue;
             }
 
@@ -220,17 +271,19 @@ public sealed class Scene3DView : Grid
 
             if (item.Type is "Camera3D" or "Camera2D" or "DirectionalLight")
             {
-                BuildMarker(item);
+                if (!IsPlaying) BuildMarker(item);
                 continue;
             }
 
-            if (item.Type == "Model3D" && !string.IsNullOrWhiteSpace(item.Model))
-            {
-                if (TryBuildModel(item)) continue;
-            }
+            var modelPath = GetModelPath(item);
+            if (!string.IsNullOrWhiteSpace(modelPath) && TryBuildModel(item, modelPath))
+                continue;
+
+            if (item.IsGameObject && TryBuildGameObject(item))
+                continue;
 
             var mesh = item.Type == "Sphere" ? _sphereMesh : _boxMesh;
-            var material = CreateMaterial(item, IsSelected(item));
+            var material = CreateMaterial(item.Color, IsSelected(item));
             var model = new GeometryModel3D(mesh, material) { BackMaterial = material };
             var visual = new ModelVisual3D
             {
@@ -243,6 +296,55 @@ public sealed class Scene3DView : Grid
         }
 
         RebuildComponentLights();
+    }
+
+    private string? GetModelPath(SceneObject item)
+    {
+        if (item.Type == "Model3D" && !string.IsNullOrWhiteSpace(item.Model)) return item.Model;
+        var renderer = item.GetComponent("MeshRenderer");
+        if (renderer is { Enabled: true } && IsModelAsset(renderer.Asset)) return renderer.Asset;
+        return null;
+    }
+
+    private static bool IsModelAsset(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        return path.EndsWith(".obj", StringComparison.OrdinalIgnoreCase) ||
+               path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase) ||
+               path.EndsWith(".gltf", StringComparison.OrdinalIgnoreCase) ||
+               path.EndsWith(".glb", StringComparison.OrdinalIgnoreCase) ||
+               path.EndsWith(".dae", StringComparison.OrdinalIgnoreCase) ||
+               path.EndsWith(".3ds", StringComparison.OrdinalIgnoreCase) ||
+               path.EndsWith(".ply", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool TryBuildGameObject(SceneObject item)
+    {
+        var camera = item.GetCameraComponent();
+        if (camera is not null)
+        {
+            if (!IsPlaying) BuildMarker(item);
+            return true;
+        }
+
+        var renderer = item.GetComponent("MeshRenderer");
+        if (renderer is not { Enabled: true }) return false;
+
+        var isSphere = string.Equals(renderer.Asset, "Sphere", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(renderer.Shape, "Sphere", StringComparison.OrdinalIgnoreCase);
+        var color = IsValidColor(renderer.Color) ? renderer.Color : item.Color;
+        var mesh = isSphere ? _sphereMesh : _boxMesh;
+        var material = CreateMaterial(color, IsSelected(item));
+        var model = new GeometryModel3D(mesh, material) { BackMaterial = material };
+        var visual = new ModelVisual3D
+        {
+            Content = model,
+            Transform = CreateTransform(item)
+        };
+        _hitModels[item.Id] = model;
+        _visuals[item.Id] = visual;
+        _objectsVisual.Children.Add(visual);
+        return true;
     }
 
     /// <summary>Luzes pontuais vindas de componentes ficam em espaço de mundo.</summary>
@@ -270,16 +372,22 @@ public sealed class Scene3DView : Grid
         }
     }
 
-    private bool TryBuildModel(SceneObject item)
+    private bool TryBuildModel(SceneObject item, string modelPath)
     {
-        var path = ResolveAsset?.Invoke(item.Model!) ?? item.Model!;
+        var path = ResolveAsset?.Invoke(modelPath) ?? modelPath;
+        var texturePath = string.IsNullOrWhiteSpace(item.ModelTexture)
+            ? ""
+            : ResolveAsset?.Invoke(item.ModelTexture) ?? item.ModelTexture;
+        var cacheKey = path + "|" + texturePath;
         try
         {
-            if (!_modelCache.TryGetValue(path, out var asset))
+            if (!_modelCache.TryGetValue(cacheKey, out var asset))
             {
                 if (!File.Exists(path)) throw new FileNotFoundException("Modelo não encontrado.", path);
                 asset = ModelAsset.Load(path);
-                _modelCache[path] = asset;
+                if (!string.IsNullOrWhiteSpace(texturePath))
+                    ApplyTextureOverride(asset.Root, texturePath);
+                _modelCache[cacheKey] = asset;
             }
 
             var content = new Model3DGroup();
@@ -288,10 +396,10 @@ public sealed class Scene3DView : Grid
             var visual = new ModelVisual3D
             {
                 Content = content,
-                Transform = CreateTransform(item)
+                Transform = CreateTransform(item, Math.Max(0.0001, item.ModelScale))
             };
             _hitModels[item.Id] = content;
-            _visualModelPaths[item.Id] = item.Model ?? "";
+            _visualModelPaths[item.Id] = cacheKey;
             _visuals[item.Id] = visual;
             _objectsVisual.Children.Add(visual);
             SyncAnimation(item);
@@ -300,6 +408,44 @@ public sealed class Scene3DView : Grid
         catch
         {
             return false;
+        }
+    }
+
+    private static void ApplyTextureOverride(Model3D model, string texturePath)
+    {
+        if (!File.Exists(texturePath)) return;
+
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.UriSource = new Uri(texturePath, UriKind.Absolute);
+            image.EndInit();
+            image.Freeze();
+
+            var brush = new ImageBrush(image) { Stretch = Stretch.Fill };
+            brush.Freeze();
+            var material = new DiffuseMaterial(brush);
+            ApplyMaterial(model, material);
+        }
+        catch
+        {
+            // Textura inválida não deve impedir o modelo de aparecer.
+        }
+    }
+
+    private static void ApplyMaterial(Model3D model, Material material)
+    {
+        switch (model)
+        {
+            case GeometryModel3D geometry:
+                geometry.Material = material;
+                geometry.BackMaterial = material;
+                break;
+            case Model3DGroup group:
+                foreach (var child in group.Children) ApplyMaterial(child, material);
+                break;
         }
     }
 
@@ -323,6 +469,17 @@ public sealed class Scene3DView : Grid
     private void BuildPointLight(SceneObject item)
     {
         var color = ParseColor(item.Color);
+        var light = new PointLight(color, new Point3D(item.X, item.Y, item.Z))
+        {
+            Range = Math.Max(0.5, item.Range * Math.Max(0.2, item.Intensity))
+        };
+
+        if (IsPlaying)
+        {
+            _componentLightsVisual.Children.Add(new ModelVisual3D { Content = light });
+            return;
+        }
+
         var material = new MaterialGroup();
         material.Children.Add(new EmissiveMaterial(new SolidColorBrush(color)));
         material.Children.Add(new DiffuseMaterial(new SolidColorBrush(Blend(color, Colors.White, 0.25))));
@@ -336,10 +493,6 @@ public sealed class Scene3DView : Grid
         _visuals[item.Id] = visual;
         _objectsVisual.Children.Add(visual);
 
-        var light = new PointLight(color, new Point3D(item.X, item.Y, item.Z))
-        {
-            Range = Math.Max(0.5, item.Range * Math.Max(0.2, item.Intensity))
-        };
         visual.Children.Add(new ModelVisual3D { Content = light });
     }
 
@@ -383,7 +536,9 @@ public sealed class Scene3DView : Grid
             state.Loop != item.AnimationLoop)
         {
             _animationStates[item.Id] = new AnimationState(item.Animation, item.AnimationSpeed, item.AnimationLoop, 0);
-            var path = ResolveAsset?.Invoke(item.Model ?? "") ?? item.Model ?? "";
+            var modelPath = GetModelPath(item) ?? "";
+            var texture = ResolveAsset?.Invoke(item.ModelTexture ?? "") ?? item.ModelTexture ?? "";
+            var path = (ResolveAsset?.Invoke(modelPath) ?? modelPath) + "|" + texture;
             if (_modelCache.TryGetValue(path, out var asset))
                 asset.SetClip(item.Animation, item.AnimationSpeed, item.AnimationLoop);
         }
@@ -397,11 +552,14 @@ public sealed class Scene3DView : Grid
         if (delta <= 0 || delta > 0.25) return;
 
         if (!IsPlaying) MoveEditorCamera(delta);
+        else UpdateGameCamera();
 
         foreach (var pair in _animationStates)
         {
             if (!_objects.TryGetValue(pair.Key, out var item)) continue;
-            var path = ResolveAsset?.Invoke(item.Model ?? "") ?? item.Model ?? "";
+            var modelPath = GetModelPath(item) ?? "";
+            var texture = ResolveAsset?.Invoke(item.ModelTexture ?? "") ?? item.ModelTexture ?? "";
+            var path = (ResolveAsset?.Invoke(modelPath) ?? modelPath) + "|" + texture;
             if (_modelCache.TryGetValue(path, out var asset)) asset.Update(delta);
         }
     }
@@ -567,9 +725,9 @@ public sealed class Scene3DView : Grid
         _viewport.Children.Add(_gridVisual);
     }
 
-    private static Material CreateMaterial(SceneObject item, bool selected)
+    private static Material CreateMaterial(string? colorValue, bool selected)
     {
-        var color = ParseColor(item.Color);
+        var color = ParseColor(colorValue);
         if (selected) color = Blend(color, AccentColor, 0.38);
 
         var material = new MaterialGroup();
@@ -653,8 +811,7 @@ public sealed class Scene3DView : Grid
             {
                 foreach (var pair in _hitModels)
                 {
-                    if (ReferenceEquals(pair.Value, model) ||
-                        (model.Geometry is MeshGeometry3D geometry && ReferenceEquals(geometry, FindMesh(pair.Value))))
+                    if (ContainsModel(pair.Value, model))
                         return _objects.TryGetValue(pair.Key, out var found) ? found : null;
                 }
             }
@@ -665,27 +822,37 @@ public sealed class Scene3DView : Grid
         }
 
         SceneObject? best = null;
-        var bestDistance = 34.0;
+        var bestDistance = double.MaxValue;
         foreach (var item in _objects.Values)
         {
-            var screen = Project(new Point3D(item.X, item.Y, item.Z));
+            if (!item.Visible) continue;
+
+            var center = new Point3D(item.X, item.Y + Math.Max(0.2, item.Scale[1] * 0.5), item.Z);
+            var screen = Project(center);
             if (screen is null) continue;
+
+            var worldRadius = Math.Max(0.35,
+                Math.Max(item.Scale[0], Math.Max(item.Scale[1], item.Scale[2])) * 0.55);
+            var pixels = worldRadius / Math.Max(0.0001, ComputeWorldPerPixel(center));
             var distance = (screen.Value - point).Length;
-            if (distance < bestDistance)
-            {
-                bestDistance = distance;
-                best = item;
-            }
+            if (distance > Math.Clamp(pixels, 14, 160)) continue;
+
+            var look = _camera.LookDirection;
+            look.Normalize();
+            var depth = Math.Max(0.1, Vector3D.DotProduct(center - _camera.Position, look));
+            var score = distance - depth * 0.001;
+            if (score >= bestDistance) continue;
+            bestDistance = score;
+            best = item;
         }
         return best;
     }
 
-    private static MeshGeometry3D? FindMesh(Model3D model) => model switch
+    private static bool ContainsModel(Model3D source, Model3D target)
     {
-        GeometryModel3D geometry => geometry.Geometry as MeshGeometry3D,
-        Model3DGroup group => group.Children.Select(FindMesh).FirstOrDefault(mesh => mesh is not null),
-        _ => null
-    };
+        if (ReferenceEquals(source, target)) return true;
+        return source is Model3DGroup group && group.Children.Any(child => ContainsModel(child, target));
+    }
 
     private void OnMouseMove(object sender, MouseEventArgs e)
     {
@@ -865,7 +1032,7 @@ public sealed class Scene3DView : Grid
         look.Normalize();
         var depth = Math.Max(0.4, Vector3D.DotProduct(point - _camera.Position, look));
         var fov = _camera.FieldOfView * Math.PI / 180.0;
-        return 2 * depth * Math.Tan(fov / 2) / Math.Max(1, ActualHeight);
+        return 2 * depth * Math.Tan(fov / 2) / Math.Max(1, ActualWidth);
     }
 
     /// <summary>Projeta um ponto do mundo na tela do viewport.</summary>
@@ -891,8 +1058,8 @@ public sealed class Scene3DView : Grid
         var fov = _camera.FieldOfView * Math.PI / 180.0;
         var aspect = ActualWidth / Math.Max(1.0, ActualHeight);
         var factor = 1.0 / Math.Tan(fov / 2);
-        var ndcX = x * factor / aspect / z;
-        var ndcY = y * factor / z;
+        var ndcX = x * factor / z;
+        var ndcY = y * factor * aspect / z;
 
         return new Point((ndcX + 1) * 0.5 * ActualWidth, (1 - ndcY) * 0.5 * ActualHeight);
     }
@@ -909,6 +1076,20 @@ public sealed class Scene3DView : Grid
         catch
         {
             return AccentColor;
+        }
+    }
+
+    private static bool IsValidColor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !value.StartsWith('#')) return false;
+        try
+        {
+            _ = (Color)ColorConverter.ConvertFromString(value);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 

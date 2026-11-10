@@ -4,8 +4,8 @@ namespace VelvX.Engine.Core;
 
 public static class EnginePaths
 {
-    public const string Version = "0.2.0";
-    public const string Codename = "Forja";
+    public const string Version = "0.3.0";
+    public const string Codename = "Bigorna";
     public const string Language = "VelvX Language";
 
     public static string BaseDirectory => AppContext.BaseDirectory;

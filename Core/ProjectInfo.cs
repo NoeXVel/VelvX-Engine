@@ -7,7 +7,7 @@ namespace VelvX.Engine.Core;
 public sealed class ProjectInfo
 {
     public string Name { get; set; } = "";
-    public string Version { get; set; } = "0.2.0";
+    public string Version { get; set; } = "0.3.0";
     public string Template { get; set; } = "";
     public string Mode { get; set; } = "3D";
     public string Language { get; set; } = EnginePaths.Language;
@@ -19,12 +19,44 @@ public sealed class ProjectInfo
     public InputMap Inputs { get; set; } = new();
     public RenderSettings Render { get; set; } = new();
 
+    /// <summary>Scripts executados uma vez no início do jogo, como gerentes/singletons.</summary>
+    public List<string> GlobalScripts { get; set; } = [];
+
+    /// <summary>Camadas disponíveis no inspetor de objetos.</summary>
+    public List<string> Layers { get; set; } = ["Default"];
+
+    /// <summary>Pares de camadas que não colidem, no formato "A|B".</summary>
+    public List<string> CollisionDisabled { get; set; } = [];
+
+    public bool LayersCollide(string first, string second)
+    {
+        var a = string.IsNullOrWhiteSpace(first) ? "Default" : first;
+        var b = string.IsNullOrWhiteSpace(second) ? "Default" : second;
+        return !CollisionDisabled.Any(pair =>
+        {
+            var parts = pair.Split('|', StringSplitOptions.TrimEntries);
+            if (parts.Length != 2) return false;
+            return (string.Equals(parts[0], a, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(parts[1], b, StringComparison.OrdinalIgnoreCase)) ||
+                   (string.Equals(parts[0], b, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(parts[1], a, StringComparison.OrdinalIgnoreCase));
+        });
+    }
+
     /// <summary>Garante que projetos antigos ganhem os campos novos sem perder dados.</summary>
     public void Normalize()
     {
         Scenes ??= [];
         Inputs ??= new InputMap();
         Render ??= new RenderSettings();
+        GlobalScripts ??= [];
+        Layers ??= [];
+        CollisionDisabled ??= [];
+
+        if (!Layers.Any(layer => string.Equals(layer, "Default", StringComparison.OrdinalIgnoreCase)))
+            Layers.Insert(0, "Default");
+        Layers = Layers.Where(layer => !string.IsNullOrWhiteSpace(layer)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        GlobalScripts = GlobalScripts.Where(script => !string.IsNullOrWhiteSpace(script)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
         if (Inputs.Actions.Count == 0)
             Inputs = InputMap.CreateDefault();

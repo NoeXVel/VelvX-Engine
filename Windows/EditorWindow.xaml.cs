@@ -117,6 +117,8 @@ func InGame()
         Title = $"{project.Info.Name} — VelvX Engine";
         ProjectNameText.Text = project.Info.Name;
         ProjectPathText.Text = project.FolderPath;
+        EngineVersionText.Text = $"VelvX Engine {EnginePaths.Version} · {EnginePaths.Codename}";
+        LanguageVersionText.Text = $"VelvX Language · {EnginePaths.Version}";
 
         var is3D = project.Is3D;
         ModeBadgeText.Text = is3D ? "3D" : "2D";
@@ -133,9 +135,10 @@ func InGame()
         View2D.ResolveAsset = path => project.ResolveAsset(path);
 
         _scenePath = project.ScenePath;
+        var sceneExisted = File.Exists(_scenePath);
         _scene = LoadSceneDocument(_scenePath);
         _scene.Mode = is3D ? "3D" : "2D";
-        if (_scene.Objects.Count == 0)
+        if (!sceneExisted && _scene.Objects.Count == 0)
             SceneFactory.Populate(_scene, is3D, project.Info.EntryScript);
 
         _scriptPath = project.ScriptPath;
@@ -194,9 +197,10 @@ func InGame()
         try
         {
             _scenePath = Path.GetFullPath(path);
+            var sceneExisted = File.Exists(_scenePath);
             _scene = LoadSceneDocument(_scenePath);
             _scene.Mode = _project.Info.Mode;
-            if (_scene.Objects.Count == 0)
+            if (!sceneExisted && _scene.Objects.Count == 0)
                 SceneFactory.Populate(_scene, _project.Is3D, _project.Info.EntryScript);
 
             RegisterCurrentScene();
@@ -255,7 +259,7 @@ func InGame()
             var button = new Button
             {
                 Style = (Style)FindResource(current ? "NavButtonActive" : "NavButton"),
-                Height = 34,
+                MinHeight = 32,
                 Tag = entry
             };
             var panel = new DockPanel();
@@ -483,20 +487,33 @@ func InGame()
             ColorSwatch.Background = new SolidColorBrush(ParseColor(item.Color));
             VisibleCheck.IsChecked = item.Visible;
             TagField.Text = item.Tag ?? "";
+            LayerField.Text = item.Layer;
+            var parent = string.IsNullOrWhiteSpace(item.ParentId) ? null : _scene?.Find(item.ParentId);
+            ParentButtonText.Text = parent is null ? "— raiz —" : parent.Name;
 
             var is3D = _project?.Is3D ?? true;
+            var isCamera = item.Type is "Camera3D" or "Camera2D" || item.HasComponent("Camera");
+            var isMesh = item.Type == "Model3D";
             SizePanel.Visibility = !is3D && item.Type is "Rectangle" or "Ellipse" or "Sprite" or "CharacterBody2D"
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-            ModelPanel.Visibility = item.Type == "Model3D" ? Visibility.Visible : Visibility.Collapsed;
+            ModelPanel.Visibility = isMesh ? Visibility.Visible : Visibility.Collapsed;
+            CameraPanel.Visibility = isCamera ? Visibility.Visible : Visibility.Collapsed;
             SpritePanel.Visibility = item.Type == "Sprite" ? Visibility.Visible : Visibility.Collapsed;
             LightPanel.Visibility = item.IsLight ? Visibility.Visible : Visibility.Collapsed;
             VolumePanel.Visibility = item.IsVolume ? Visibility.Visible : Visibility.Collapsed;
 
             ModelPathField.Text = item.Model ?? "";
+            ModelScaleField.Text = FormatNumber(item.ModelScale);
+            ModelTextureField.Text = item.ModelTexture ?? "";
             AnimationField.Text = item.Animation ?? "";
             AnimationSpeedField.Text = FormatNumber(item.AnimationSpeed);
             AnimationLoopCheck.IsChecked = item.AnimationLoop;
+
+            FovField.Text = FormatNumber(item.Fov);
+            NearField.Text = FormatNumber(item.NearPlane);
+            FarField.Text = FormatNumber(item.FarPlane);
+            CameraActiveCheck.IsChecked = item.CameraActive;
 
             if (item.Sprite is null && item.Type == "Sprite") item.Sprite = new SpriteSettings();
             SpritePathField.Text = item.Sprite?.Path ?? "";
@@ -598,6 +615,31 @@ func InGame()
             changed = true;
         }
 
+        var layer = LayerField.Text.Trim();
+        if (string.IsNullOrWhiteSpace(layer)) layer = "Default";
+        if (!string.Equals(layer, item.Layer, StringComparison.OrdinalIgnoreCase))
+        {
+            item.Layer = layer;
+            changed = true;
+        }
+
+        if (CameraPanel.Visibility == Visibility.Visible)
+        {
+            var fov = Math.Clamp(ParseNumber(FovField.Text, item.Fov), 10, 170);
+            var near = Math.Max(0.01, ParseNumber(NearField.Text, item.NearPlane));
+            var far = Math.Max(near + 1, ParseNumber(FarField.Text, item.FarPlane));
+            var cameraActive = CameraActiveCheck.IsChecked == true;
+            if (!NearlyEqual(fov, item.Fov) || !NearlyEqual(near, item.NearPlane) ||
+                !NearlyEqual(far, item.FarPlane) || cameraActive != item.CameraActive)
+            {
+                item.Fov = fov;
+                item.NearPlane = near;
+                item.FarPlane = far;
+                item.CameraActive = cameraActive;
+                changed = true;
+            }
+        }
+
         var color = ColorField.Text.Trim();
         if (IsValidColor(color) && !string.Equals(color, item.Color, StringComparison.OrdinalIgnoreCase))
         {
@@ -620,6 +662,8 @@ func InGame()
         if (ModelPanel.Visibility == Visibility.Visible)
         {
             var model = ModelPathField.Text.Trim();
+            var texture = ModelTextureField.Text.Trim();
+            var modelScale = Math.Max(0.01, ParseNumber(ModelScaleField.Text, item.ModelScale));
             var animation = AnimationField.Text.Trim();
             var speed = Math.Max(0.01, ParseNumber(AnimationSpeedField.Text, item.AnimationSpeed));
             var loop = AnimationLoopCheck.IsChecked == true;
@@ -627,6 +671,16 @@ func InGame()
             if (!string.Equals(model, item.Model ?? "", StringComparison.OrdinalIgnoreCase))
             {
                 item.Model = string.IsNullOrWhiteSpace(model) ? null : model;
+                changed = true;
+            }
+            if (!string.Equals(texture, item.ModelTexture ?? "", StringComparison.OrdinalIgnoreCase))
+            {
+                item.ModelTexture = string.IsNullOrWhiteSpace(texture) ? null : texture;
+                changed = true;
+            }
+            if (!NearlyEqual(modelScale, item.ModelScale))
+            {
+                item.ModelScale = modelScale;
                 changed = true;
             }
             item.Animation = string.IsNullOrWhiteSpace(animation) ? null : animation;
@@ -718,6 +772,22 @@ func InGame()
 
     private void VisibleCheck_Click(object sender, RoutedEventArgs e) => ApplyInspector();
 
+    private void CameraActive_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selected is null || _isPlaying) return;
+        if (CameraActiveCheck.IsChecked == true && _scene is not null)
+        {
+            foreach (var other in _scene.Objects)
+            {
+                if (!ReferenceEquals(other, _selected) &&
+                    (other.Type is "Camera3D" or "Camera2D" || other.HasComponent("Camera")))
+                    other.CameraActive = false;
+            }
+        }
+        ApplyInspector();
+        RefreshPlayCamera();
+    }
+
     private void AnimationLoop_Click(object sender, RoutedEventArgs e) => ApplyInspector();
 
     private void SpriteLoop_Click(object sender, RoutedEventArgs e) => ApplyInspector();
@@ -743,6 +813,13 @@ func InGame()
         AddComponentMenu.Children.Clear();
         AddMenuTitle(AddComponentMenu, "ADICIONAR COMPONENTE");
         AddMenuButton(AddComponentMenu, "≡  Script VelvX", () => AddComponent("Script"));
+        AddMenuButton(AddComponentMenu, "▤  Câmera", () => AddComponent("Camera"));
+        AddMenuButton(AddComponentMenu, "◆  Mesh Renderer", () => AddComponent("MeshRenderer"));
+        AddMenuButton(AddComponentMenu, "▣  Collider de caixa", () => AddComponent("BoxCollider"));
+        AddMenuButton(AddComponentMenu, "●  Collider de esfera", () => AddComponent("SphereCollider"));
+        AddMenuButton(AddComponentMenu, "⬇  Rigidbody", () => AddComponent("Rigidbody"));
+        AddMenuButton(AddComponentMenu, "♪  Audio Source", () => AddComponent("AudioSource"));
+        AddMenuSeparator(AddComponentMenu);
         AddMenuButton(AddComponentMenu, "↻  Rotador", () => AddComponent("Rotator"));
         AddMenuButton(AddComponentMenu, "▧  Animador de sprite", () => AddComponent("SpriteAnimator"));
         AddMenuButton(AddComponentMenu, "☼  Luz pontual", () => AddComponent("PointLight"));
@@ -778,6 +855,32 @@ func InGame()
             case "BoxVolume":
                 component.Color = "#6B5AA8";
                 component.Amount = 1;
+                break;
+            case "Camera":
+                component.Fov = 60;
+                component.NearPlane = 0.2;
+                component.FarPlane = 1200;
+                _selected.CameraActive = true;
+                break;
+            case "MeshRenderer":
+                component.Asset = "Box";
+                component.Shape = "Box";
+                component.Color = _selected.Color;
+                break;
+            case "BoxCollider":
+                component.Shape = "Box";
+                break;
+            case "SphereCollider":
+                component.Shape = "Sphere";
+                break;
+            case "Rigidbody":
+                component.Mass = 1;
+                component.Gravity = 9.8;
+                component.UseGravity = true;
+                break;
+            case "AudioSource":
+                component.Volume = 1;
+                component.Loop = true;
                 break;
             case "Script":
                 var picker = new OpenFileDialog
@@ -927,6 +1030,76 @@ func InGame()
                     ("COR", component.Color, value => { if (IsValidColor(value)) component.Color = value; ComponentChanged(component); }),
                     ("INTENSIDADE", FormatNumber(component.Amount), value => { component.Amount = Math.Max(0.01, ParseNumber(value, component.Amount)); ComponentChanged(component); }));
                 break;
+
+            case "Camera":
+                AddInlineFields(stack,
+                    ("FOV", FormatNumber(component.Fov), value => { component.Fov = Math.Clamp(ParseNumber(value, component.Fov), 10, 170); ComponentChanged(component); }),
+                    ("NEAR", FormatNumber(component.NearPlane), value => { component.NearPlane = Math.Max(0.01, ParseNumber(value, component.NearPlane)); ComponentChanged(component); }),
+                    ("FAR", FormatNumber(component.FarPlane), value => { component.FarPlane = Math.Max(component.NearPlane + 1, ParseNumber(value, component.FarPlane)); ComponentChanged(component); }));
+                AddInlineCheck(stack, "Câmera principal no modo Play", _selected?.CameraActive == true, value =>
+                {
+                    if (_selected is not null) _selected.CameraActive = value;
+                    ComponentChanged(component);
+                });
+                break;
+
+            case "MeshRenderer":
+                AddInlineFields(stack,
+                    ("MALHA, BOX, ESFERA OU MODELO", component.Asset ?? "Box", value =>
+                    {
+                        component.Asset = string.IsNullOrWhiteSpace(value) ? "Box" : value.Trim();
+                        ComponentChanged(component);
+                    }),
+                    ("COR", component.Color, value => { if (IsValidColor(value)) component.Color = value; ComponentChanged(component); }));
+                var selectedItem = _selected;
+                AddInlineFields(stack,
+                    ("ESCALA DO MODELO", FormatNumber(selectedItem?.ModelScale ?? 1), value =>
+                    {
+                        if (selectedItem is not null) selectedItem.ModelScale = Math.Max(0.01, ParseNumber(value, selectedItem.ModelScale));
+                        ComponentChanged(component);
+                    }),
+                    ("TEXTURA (OPCIONAL)", selectedItem?.ModelTexture ?? "", value =>
+                    {
+                        if (selectedItem is not null)
+                            selectedItem.ModelTexture = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+                        ComponentChanged(component);
+                    }));
+                break;
+
+            case "BoxCollider":
+            case "SphereCollider":
+                AddInlineFields(stack,
+                    ("CAMADAS (MÁSCARA)", component.LayerMask, value => { component.LayerMask = string.IsNullOrWhiteSpace(value) ? "*" : value.Trim(); ComponentChanged(component); }));
+                AddInlineCheck(stack, "É um gatilho (OnTriggerEnter / Stay / Exit)", component.Trigger, value =>
+                {
+                    component.Trigger = value;
+                    ComponentChanged(component);
+                });
+                break;
+
+            case "Rigidbody":
+                AddInlineFields(stack,
+                    ("MASSA", FormatNumber(component.Mass), value => { component.Mass = Math.Max(0.01, ParseNumber(value, component.Mass)); ComponentChanged(component); }),
+                    ("GRAVIDADE", FormatNumber(component.Gravity), value => { component.Gravity = Math.Max(0, ParseNumber(value, component.Gravity)); ComponentChanged(component); }));
+                AddInlineCheck(stack, "Usar gravidade", component.UseGravity, value =>
+                {
+                    component.UseGravity = value;
+                    ComponentChanged(component);
+                });
+                break;
+
+            case "AudioSource":
+                AddAssetField(stack, "ARQUIVO DE ÁUDIO", component.Asset ?? "",
+                    "Áudio (*.wav;*.mp3;*.ogg)|*.wav;*.mp3;*.ogg|Todos os arquivos (*.*)|*.*",
+                    value => { component.Asset = value; ComponentChanged(component); });
+                AddInlineFields(stack,
+                    ("VOLUME", FormatNumber(component.Volume), value => { component.Volume = Math.Clamp(ParseNumber(value, component.Volume), 0, 1); ComponentChanged(component); }));
+                AddInlineCheck(stack, "Repetir ao terminar", component.Loop, value =>
+                {
+                    component.Loop = value;
+                    ComponentChanged(component);
+                });
+                break;
         }
 
         card.Child = stack;
@@ -1018,10 +1191,78 @@ func InGame()
         parent.Children.Add(grid);
     }
 
+    private void AddInlineCheck(StackPanel parent, string text, bool value, Action<bool> apply)
+    {
+        var check = new CheckBox
+        {
+            Content = text,
+            IsChecked = value,
+            FontSize = 10,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        check.Click += (_, _) => apply(check.IsChecked == true);
+        parent.Children.Add(check);
+    }
+
+    private void AddAssetField(StackPanel parent, string label, string value, string filter, Action<string> apply)
+    {
+        parent.Children.Add(new TextBlock
+        {
+            Text = label,
+            FontSize = 9,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(138, 142, 158)),
+            Margin = new Thickness(0, 8, 0, 4)
+        });
+
+        var row = new DockPanel();
+        var pick = new Button
+        {
+            Style = (Style)FindResource("GhostButton"),
+            Content = "Escolher",
+            FontSize = 9.5,
+            Padding = new Thickness(8, 4, 8, 4),
+            Margin = new Thickness(4, 0, 0, 0)
+        };
+        DockPanel.SetDock(pick, Dock.Right);
+        row.Children.Add(pick);
+
+        var box = new TextBox
+        {
+            Text = value,
+            FontSize = 10,
+            Padding = new Thickness(7, 5, 7, 5),
+            MinHeight = 26
+        };
+        box.LostFocus += (_, _) => apply(box.Text.Trim());
+        box.KeyDown += (_, args) =>
+        {
+            if (args.Key != Key.Enter) return;
+            apply(box.Text.Trim());
+            args.Handled = true;
+        };
+        pick.Click += (_, _) =>
+        {
+            var picker = new OpenFileDialog
+            {
+                Title = label,
+                Filter = filter,
+                InitialDirectory = _project?.Resolve("Assets", "Assets")
+            };
+            if (picker.ShowDialog(this) != true) return;
+            var relative = _project?.ToRelativePath(picker.FileName) ?? picker.FileName;
+            box.Text = relative;
+            apply(relative);
+        };
+        row.Children.Add(box);
+        parent.Children.Add(row);
+    }
+
     private void ComponentChanged(ComponentData component)
     {
         SetDirty(true);
-        if (component.Type is "PointLight" or "BoxVolume")
+        if (component.Type is "PointLight" or "BoxVolume" or "MeshRenderer" or "Camera" or
+            "BoxCollider" or "SphereCollider" or "Rigidbody" or "AudioSource")
             LoadSceneIntoViews();
     }
 
@@ -1071,7 +1312,7 @@ func InGame()
 
             case "view":
                 AddMenuTitle(MenuPopupPanel, "JANELA");
-                AddMenuButton(MenuPopupPanel, "Editor de script", () => ScriptEditor.Focus());
+                AddMenuButton(MenuPopupPanel, "Editor de script", OpenLargeScriptWindow);
                 AddMenuButton(MenuPopupPanel, "Recursos", RefreshResources);
                 AddMenuButton(MenuPopupPanel, "Saída", () => ConsoleList.Focus());
                 AddMenuButton(MenuPopupPanel, _helpVisible ? "Ocultar ajuda do script" : "Mostrar ajuda do script", ToggleHelp);
@@ -1083,7 +1324,7 @@ func InGame()
                 AddMenuTitle(MenuPopupPanel, "AJUDA");
                 AddMenuButton(MenuPopupPanel, "Referência da VelvX Language", ToggleHelp);
                 AddMenuButton(MenuPopupPanel, "Atalhos do editor", ShowShortcuts);
-                AddMenuButton(MenuPopupPanel, "Sobre o VelvX 0.2.0", ShowAbout);
+                AddMenuButton(MenuPopupPanel, $"Sobre o VelvX {EnginePaths.Version}", ShowAbout);
                 break;
         }
 
@@ -1109,8 +1350,9 @@ func InGame()
         {
             Content = text,
             Style = (Style)FindResource("NavButton"),
-            Height = 32,
-            FontSize = 11.5
+            MinHeight = 30,
+            FontSize = 11.5,
+            Padding = new Thickness(12, 6, 12, 6)
         };
         button.Click += (_, _) =>
         {
@@ -1230,6 +1472,42 @@ func InGame()
     }
 
     private void OpenScript_Click(object sender, RoutedEventArgs e) => OpenScriptDialog();
+
+    private void OpenLargeScript_Click(object sender, RoutedEventArgs e) => OpenLargeScriptWindow();
+
+    private void OpenLargeScriptWindow()
+    {
+        if (_project is null) return;
+        if (_isPlaying)
+        {
+            AddConsole("Pare a execução antes de editar o script.", ScriptLogLevel.Warning);
+            return;
+        }
+
+        var window = new ScriptEditorWindow(_project, _scriptPath, ScriptEditor.Text) { Owner = this };
+        window.ShowDialog();
+
+        var path = window.ActivePath;
+        var text = window.ActiveText;
+        var onDisk = File.Exists(path) ? File.ReadAllText(path) : text;
+
+        _scriptPath = path;
+        _loading = true;
+        try
+        {
+            ScriptEditor.Text = text;
+            ScriptEditor.CaretOffset = 0;
+        }
+        finally
+        {
+            _loading = false;
+        }
+
+        ScriptFileText.Text = Path.GetFileName(_scriptPath);
+        SetScriptDirty(text != onDisk);
+        ScriptEditor.Focus();
+        AddConsole($"Script '{Path.GetFileName(_scriptPath)}' sincronizado com o editor grande.", ScriptLogLevel.Info);
+    }
 
     private void OpenScriptDialog()
     {
@@ -1445,6 +1723,7 @@ func InGame()
 
         _isPlaying = true;
         SetPlayingUi(true);
+        RefreshPlayCamera();
         UpdateLoadedScenes();
         _frameClock.Restart();
         _lastFrameTime = TimeSpan.Zero;
@@ -1590,6 +1869,7 @@ func InGame()
         View2D.LoadScene(document);
         View3D.SetPlayMode(true);
         View2D.SetPlayMode(true);
+        RefreshPlayCamera();
         RefreshHierarchy();
         UpdateInspector();
         AddConsole($"Cena ativa: '{document.Name}'.", ScriptLogLevel.Info);
@@ -1607,6 +1887,35 @@ func InGame()
         LoadedScenesText.Text = names.Count == 0
             ? "Nenhuma cena carregada."
             : $"{names.Count} carregada(s): {string.Join(", ", names)}";
+    }
+
+    private void RefreshPlayCamera()
+    {
+        var camera = FindGameCamera(_scene);
+        if (_project?.Is3D != false)
+        {
+            View3D.SetGameCamera(camera);
+            View2D.SetGameCamera(null);
+        }
+        else
+        {
+            View3D.SetGameCamera(null);
+            View2D.SetGameCamera(camera);
+        }
+    }
+
+    private static SceneObject? FindGameCamera(SceneDocument? scene)
+    {
+        if (scene is null) return null;
+
+        var direct = scene.Objects.FirstOrDefault(item =>
+            item.Visible && item.CameraActive &&
+            (item.Type is "Camera3D" or "Camera2D") &&
+            item.GetComponent("Camera") is not { Enabled: false });
+        if (direct is not null) return direct;
+
+        return scene.Objects.FirstOrDefault(item =>
+            item.Visible && item.CameraActive && item.GetComponent("Camera") is { Enabled: true });
     }
 
     private void SetPlayingUi(bool playing)
@@ -1659,6 +1968,8 @@ func InGame()
         AddMenuTitle(AddObjectMenu, "ADICIONAR OBJETO");
 
         var is3D = _project?.Is3D ?? true;
+        AddMenuButton(AddObjectMenu, "○  Objeto vazio (GameObject)", () => CreateObject("GameObject"));
+        AddMenuSeparator(AddObjectMenu);
         if (is3D)
         {
             AddMenuButton(AddObjectMenu, "▣  Caixa", () => CreateObject("Box"));
@@ -1732,9 +2043,108 @@ func InGame()
 
     private void SetAsGameCamera_Click(object sender, RoutedEventArgs e)
     {
-        MessageBox.Show(this,
-            "A câmera do modo Play é automática nesta versão. Mova a vista no editor e o jogo usa a cena como referência; para controlar a câmera em tempo real, use scripts de componente em um objeto Camera3D.",
-            "Câmera do jogo", MessageBoxButton.OK, MessageBoxImage.Information);
+        if (_selected is null || _scene is null || _isPlaying) return;
+        if (_selected.Type is not ("Camera3D" or "Camera2D") && !_selected.HasComponent("Camera"))
+        {
+            MessageBox.Show(this,
+                "Selecione uma câmera (ou adicione o componente Câmera a este objeto) para defini-la como câmera do jogo.",
+                "Câmera do jogo", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        foreach (var other in _scene.Objects)
+        {
+            if (!ReferenceEquals(other, _selected) &&
+                (other.Type is "Camera3D" or "Camera2D" || other.HasComponent("Camera")))
+                other.CameraActive = false;
+        }
+
+        _selected.Visible = true;
+        _selected.CameraActive = true;
+        _selected.EnsureDefaults();
+        SetDirty(true);
+        UpdateInspector();
+        AddConsole($"'{_selected.Name}' será a câmera principal no modo Play.", ScriptLogLevel.Info);
+    }
+
+    private void ParentButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selected is null || _scene is null || _isPlaying) return;
+
+        var popup = new Popup
+        {
+            PlacementTarget = ParentButton,
+            Placement = PlacementMode.Bottom,
+            StaysOpen = false,
+            AllowsTransparency = true
+        };
+        var border = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(27, 30, 39)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(51, 55, 68)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(6),
+            MinWidth = ParentButton.ActualWidth,
+            MaxHeight = 320
+        };
+        var panel = new StackPanel();
+        var scroll = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = panel
+        };
+        AddMenuTitle(panel, "OBJETO PAI");
+        AddParentChoice(panel, popup, null);
+        foreach (var candidate in _scene.Objects)
+        {
+            if (ReferenceEquals(candidate, _selected) || IsDescendantOf(candidate, _selected)) continue;
+            AddParentChoice(panel, popup, candidate);
+        }
+        border.Child = scroll;
+        popup.Child = border;
+        popup.IsOpen = true;
+    }
+
+    private void AddParentChoice(StackPanel panel, Popup popup, SceneObject? candidate)
+    {
+        var isCurrent = candidate is null
+            ? string.IsNullOrWhiteSpace(_selected?.ParentId)
+            : string.Equals(_selected?.ParentId, candidate.Id, StringComparison.OrdinalIgnoreCase);
+        var button = new Button
+        {
+            Style = (Style)FindResource(isCurrent ? "NavButtonActive" : "NavButton"),
+            MinHeight = 28,
+            FontSize = 11,
+            Padding = new Thickness(10, 5, 10, 5),
+            Content = candidate is null ? "— raiz da cena —" : $"{candidate.Glyph}  {candidate.Name}"
+        };
+        button.Click += (_, _) =>
+        {
+            popup.IsOpen = false;
+            if (_selected is null) return;
+            _selected.ParentId = candidate?.Id;
+            SetDirty(true);
+            RefreshHierarchy(_selected.Id);
+            UpdateInspector();
+            AddConsole(candidate is null
+                ? $"'{_selected.Name}' voltou para a raiz da cena."
+                : $"'{_selected.Name}' agora é filho de '{candidate.Name}'.", ScriptLogLevel.Info);
+        };
+        panel.Children.Add(button);
+    }
+
+    private bool IsDescendantOf(SceneObject candidate, SceneObject ancestor)
+    {
+        if (_scene is null) return false;
+        var parentId = candidate.ParentId;
+        var guard = 0;
+        while (!string.IsNullOrWhiteSpace(parentId) && guard++ < 64)
+        {
+            if (string.Equals(parentId, ancestor.Id, StringComparison.OrdinalIgnoreCase)) return true;
+            parentId = _scene.Find(parentId)?.ParentId;
+        }
+        return false;
     }
 
     // ── Recursos e prefabs ───────────────────────────────────────────────────

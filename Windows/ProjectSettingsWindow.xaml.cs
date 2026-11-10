@@ -18,7 +18,9 @@ public partial class ProjectSettingsWindow : Window
     private InputMap _inputs;
     private RenderSettings _render;
     private EnvironmentSettings _environment;
-    private ObservableCollection<SceneEntry> _scenes;
+    private readonly ObservableCollection<SceneEntry> _scenes;
+    private readonly ObservableCollection<string> _layers;
+    private readonly ObservableCollection<string> _globalScripts;
     private bool _updating;
     private string _currentPage = "general";
 
@@ -37,6 +39,9 @@ public partial class ProjectSettingsWindow : Window
         };
         _environment = scene.Environment.Clone();
         _scenes = new ObservableCollection<SceneEntry>(project.Info.Scenes.Select(entry => entry.Clone()));
+        _layers = new ObservableCollection<string>(project.Info.Layers);
+        if (_layers.Count == 0) _layers.Add("Default");
+        _globalScripts = new ObservableCollection<string>(project.Info.GlobalScripts);
 
         ProjectLabel.Text = $"{project.Info.Name}  ·  {project.FolderPath}";
         NameBox.Text = project.Info.Name;
@@ -60,6 +65,9 @@ public partial class ProjectSettingsWindow : Window
 
         InputList.ItemsSource = _inputs.Actions;
         SceneList.ItemsSource = _scenes;
+        LayerList.ItemsSource = _layers;
+        GlobalScriptList.ItemsSource = _globalScripts;
+        CollisionPairsBox.Text = string.Join(Environment.NewLine, project.Info.CollisionDisabled);
         InputList.SelectedIndex = _inputs.Actions.Count > 0 ? 0 : -1;
         SceneList.SelectedIndex = _scenes.Count > 0 ? 0 : -1;
         ShowPage("general");
@@ -115,7 +123,8 @@ public partial class ProjectSettingsWindow : Window
             ["inputs"] = (PanelInputs, NavInputs),
             ["render"] = (PanelRender, NavRender),
             ["environment"] = (PanelEnvironment, NavEnvironment),
-            ["scenes"] = (PanelScenes, NavScenes)
+            ["scenes"] = (PanelScenes, NavScenes),
+            ["advanced"] = (PanelAdvanced, NavAdvanced)
         };
 
         foreach (var pair in pages)
@@ -319,6 +328,61 @@ public partial class ProjectSettingsWindow : Window
         StatusLabel.Text = $"'{entry.Name}' será a cena inicial.";
     }
 
+    private void AddLayer_Click(object sender, RoutedEventArgs e)
+    {
+        var name = InputPrompt.Ask(this, "Nova camada", "Nome da camada (ex.: Player, Inimigo, Cenário)");
+        if (string.IsNullOrWhiteSpace(name)) return;
+        var clean = name.Trim();
+        if (_layers.Any(layer => string.Equals(layer, clean, StringComparison.OrdinalIgnoreCase)))
+        {
+            StatusLabel.Text = $"A camada '{clean}' já existe.";
+            return;
+        }
+        _layers.Add(clean);
+        LayerList.SelectedItem = clean;
+        StatusLabel.Text = $"Camada '{clean}' criada. Defina a camada dos objetos no inspetor.";
+    }
+
+    private void RemoveLayer_Click(object sender, RoutedEventArgs e)
+    {
+        if (LayerList.SelectedItem is not string layer) return;
+        if (string.Equals(layer, "Default", StringComparison.OrdinalIgnoreCase))
+        {
+            StatusLabel.Text = "A camada Default não pode ser removida.";
+            return;
+        }
+        _layers.Remove(layer);
+        StatusLabel.Text = $"Camada '{layer}' removida da lista.";
+    }
+
+    private void AddGlobalScript_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Adicionar script global",
+            Filter = "Script VelvX (*.velv)|*.velv|Todos os arquivos (*.*)|*.*",
+            InitialDirectory = _project.Resolve("Scripts", "Scripts")
+        };
+        if (picker.ShowDialog(this) != true) return;
+
+        var relative = _project.ToRelativePath(picker.FileName);
+        if (_globalScripts.Contains(relative, StringComparer.OrdinalIgnoreCase))
+        {
+            StatusLabel.Text = "Esse script já é global.";
+            return;
+        }
+        _globalScripts.Add(relative);
+        GlobalScriptList.SelectedItem = relative;
+        StatusLabel.Text = $"Script global '{Path.GetFileName(relative)}' adicionado.";
+    }
+
+    private void RemoveGlobalScript_Click(object sender, RoutedEventArgs e)
+    {
+        if (GlobalScriptList.SelectedItem is not string script) return;
+        _globalScripts.Remove(script);
+        StatusLabel.Text = $"Script global '{Path.GetFileName(script)}' removido.";
+    }
+
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         if (InputList.SelectedItem is InputAction action)
@@ -379,6 +443,15 @@ public partial class ProjectSettingsWindow : Window
         _project.Info.Render = _render;
         _project.Info.Scenes = _scenes.ToList();
         _project.Info.StartScene = _scenes.First(scene => scene.Start).Path;
+        _project.Info.Layers = _layers.ToList();
+        _project.Info.GlobalScripts = _globalScripts.ToList();
+        _project.Info.CollisionDisabled = CollisionPairsBox.Text
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(line => line.Contains('|'))
+            .Select(line => string.Join('|', line.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)))
+            .Where(line => line.Contains('|'))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         _scene.Environment = _environment.Clone();
         _project.Info.Normalize();
 

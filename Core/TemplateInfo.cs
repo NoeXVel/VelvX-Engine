@@ -10,7 +10,7 @@ public sealed class TemplateInfo
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     public string Mode { get; set; } = "2D";
-    public string Version { get; set; } = "0.2.0";
+    public string Version { get; set; } = "0.3.0";
 
     [JsonIgnore] public string FolderPath { get; set; } = "";
     [JsonIgnore] public string Glyph => Is3D ? "◈" : "▤";
@@ -87,7 +87,7 @@ public static class TemplateService
             Info = new ProjectInfo
             {
                 Name = projectName,
-                Version = "0.2.0",
+                Version = EnginePaths.Version,
                 Template = template.Id,
                 Mode = template.Is3D ? "3D" : "2D",
                 Language = EnginePaths.Language,

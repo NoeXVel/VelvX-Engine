@@ -25,7 +25,7 @@ git init
 git branch -M main
 
 git add .
-git commit -m "VelvX Engine 0.2.0 - Forja: gizmos, scripts coloridos, inputs, prefabs, streaming e modelos"
+git commit -m "VelvX Engine 0.3.0 - Bigorna: GameObject, componentes, física, triggers e janela de script"
 
 git remote add origin https://github.com/NoeXVel/VelvX-Engine.git
 git fetch origin
@@ -58,34 +58,41 @@ git push
    O script lê a versão do `.csproj`, publica a Engine para `win-x64` (self-contained), copia os templates e gera `dist\VelvX-Engine-win-x64.zip`.
 
 2. Abra <https://github.com/NoeXVel/VelvX-Engine/releases> e clique em **Draft a new release**.
-3. Crie a tag `v0.2.0`, título `VelvX Engine 0.2.0 — Forja` e use as notas abaixo.
+3. Crie a tag `v0.3.0`, título `VelvX Engine 0.3.0 — Bigorna` e use as notas abaixo.
 4. Anexe `dist\VelvX-Engine-win-x64.zip` em **Attach binaries**.
 5. Publique a release. Quem baixar só precisa extrair e executar `VelvX.Engine.exe` — não é necessário instalar o .NET.
 
-### Notas sugeridas para a release v0.2.0
+### Notas sugeridas para a release v0.3.0
 
 ```markdown
-## VelvX Engine 0.2.0 — Forja
+## VelvX Engine 0.3.0 — Bigorna
 
-A primeira build pensada para começar jogos de verdade.
+A build que corrige os problemas da issue #1 e fecha a base para jogos 2D e 3D.
 
-### Editor
-- Setas de transformação (X/Y/Z) com arraste no viewport, snap com Ctrl/Shift e foco com F.
-- Câmera de edição 3D livre: WASD/setas, E sobe, Q desce, Shift acelera e Ctrl aproxima.
-- Painel de script ao lado da Saída, com realce de sintaxe e ajuda da VelvX Language.
-- Project Settings (Ctrl+,) com aba de Entradas para criar ações e teclas próprias.
-- Painel de Recursos ao lado da Saída: cenas, scripts, assets e prefabs.
-- Prefabs por arraste da hierarquia para a pasta `Prefabs` e de volta para a cena.
-- Inspetor com componentes (Script, Rotator, PointLight) e edição de modelos, sprites, luzes e volumes.
-- Hierarquia melhorada, criação de cenas e rodapé com as cenas carregadas.
+### Corrigido
+- Gizmos de transformação agora seguem o objeto selecionado e funcionam no viewport 3D e 2D.
+- Clique no viewport seleciona o objeto correto.
+- Textos de botões não são mais cortados verticalmente (MinHeight + Padding).
+- Projetos novos 3D/2D não nascem mais com objetos duplicados ou cena inexistente.
+- Novos templates Vazio 3D e Vazio 2D para começar do zero, com apenas a câmera e o script de entrada.
 
-### Jogos
-- Modelos 3D OBJ/FBX/GLTF/GLB, com texturas e animações por skin/nó.
-- 2D com sprites, GIFs animados e spritesheets.
+### Adicionado
+- GameObject + Transform como base: todo objeto tem transformação e pode receber componentes.
+- Câmera nativa editável: FOV, near, far, câmera principal e botão para definir a câmera do jogo.
+- Janela grande de script: autocomplete, auto-indent, realce, lista de scripts e referência rápida clicável.
+- Componentes: Script, Câmera, Mesh Renderer, Box/Sphere Collider, Rigidbody e Audio Source.
+- Física simples e triggers OnTriggerEnter/Stay/Exit.
+- Hierarquia em scripts: get_parent/get_children/find_child/is_child_of e pai editável no inspetor.
+- Camadas, matriz de colisão e scripts globais em Configurações do Projeto → Camadas e scripts.
+- Escala e textura por modelo 3D no inspetor.
+- Importação de modelos 3D por menu, arraste ou inspetor.
+
+### Já disponível
+- Modelos OBJ/FBX/GLTF/GLB com texturas e animações.
+- Sprites, GIFs e spritesheets no 2D.
 - Streaming de cenas com `Scene("Nome").load()/unload()/set_active()/is_loaded()`.
-- Iluminação com ambiente, sol direcional, luzes pontuais, Global Volume e Box Volume.
-- Limite de FPS configurável e modo de renderização para PCs modestos.
-- VelvX Language com inputs personalizados, acesso à cena, componentes e ciclo Main/InGame.
+- Iluminação com ambiente, sol, luzes pontuais, Global Volume e Box Volume.
+- Inputs personalizados, limite de FPS e VelvX Language com Main/InGame.
 
 ### Requisitos
 - Windows 10/11 64 bits, 4 GB de RAM (8 GB recomendado), GPU com DirectX 11 (GTX 1650 roda com folga).

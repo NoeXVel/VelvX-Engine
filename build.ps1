@@ -11,7 +11,7 @@ $dist = Join-Path $root "dist"
 $output = Join-Path $dist "VelvX-Engine-$Runtime"
 $zip = "$output.zip"
 
-$version = "0.2.0"
+$version = "0.3.0"
 $match = [regex]::Match((Get-Content $project -Raw), "<Version>([^<]+)</Version>")
 if ($match.Success) { $version = $match.Groups[1].Value }
 
@@ -55,22 +55,24 @@ if ((Test-Path $sourceTemplates) -and -not (Test-Path $targetTemplates)) {
 }
 
 $readme = @"
-VelvX Engine $version - Forja
-=============================
+VelvX Engine $version - Bigorna
+===============================
 
 1. Extraia esta pasta em qualquer lugar do computador.
 2. Execute VelvX.Engine.exe.
-3. Crie um projeto em Novo projeto (2D ou 3D) e comece a construir.
+3. Crie um projeto em Novo projeto: 3D, 2D, Vazio 3D ou Vazio 2D.
 
-Novidades da 0.2.0:
-  - setas coloridas para mover os objetos na cena;
-  - camera 3D com WASD (E/Q sobem e descem);
-  - editor de script com cores, ajuda e numeracao;
-  - Configuracoes do Projeto com Inputs personalizados, renderizacao,
-    iluminacao e cenas;
-  - recursos, prefabs, modelos 3D, sprites, GIFs e spritesheets;
-  - componentes, luzes pontuais, Global Volume e Box Volume;
-  - streaming de cenas com Scene("Nome").load()/unload().
+Novidades da 0.3.0:
+  - GameObject + Transform e componentes obrigatorios;
+  - setas coloridas seguindo o objeto e selecao pelo viewport;
+  - camera nativa editavel (FOV, near, far e camera principal);
+  - janela grande de script com autocomplete, auto-indent e referencia;
+  - fisica simples, rigidbody, colliders e triggers OnTriggerEnter/Stay/Exit;
+  - hierarquia por script (parent, children, find_child) e camadas;
+  - scripts globais e scripts por objeto;
+  - escala e textura por modelo 3D;
+  - templates Vazio 3D/Vazio 2D sem objetos de exemplo;
+  - textos de botoes sem corte e recursos com icones e arrastar-soltar.
 
 Teclas no editor:
   F5 ........ iniciar o jogo
@@ -92,6 +94,10 @@ Set-Content -Path (Join-Path $output "LEIA-ME.txt") -Value $readme -Encoding UTF
 if (-not $NoZip) {
     Write-Host "  Compactando..." -ForegroundColor Cyan
     Compress-Archive -Path (Join-Path $output "*") -DestinationPath $zip -CompressionLevel Optimal
+
+    Write-Host "  Gerando SHA-256..." -ForegroundColor Cyan
+    $hash = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+    Set-Content -Path "dist/SHA256.txt" -Value ("{0}  {1}" -f $hash, (Split-Path $zip -Leaf)) -Encoding ASCII
 }
 
 $size = (Get-ChildItem -Recurse $output | Measure-Object -Property Length -Sum).Sum / 1MB

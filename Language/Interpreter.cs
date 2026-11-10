@@ -25,6 +25,24 @@ public sealed class Interpreter
 
     public bool HasFunction(string name) => _functions.ContainsKey(name);
 
+    /// <summary>Chama uma função do script (eventos, triggers). Não lança erro para o jogo.</summary>
+    public bool CallFunction(string name, params object?[] arguments)
+    {
+        if (!_functions.TryGetValue(name, out var function)) return false;
+
+        try
+        {
+            Invoke(function, arguments.ToList(), 1);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            var message = exception is VelvXException velvx ? velvx.FriendlyMessage : exception.Message;
+            _host.Show($"Erro em {name}(): {message}", ScriptLogLevel.Error);
+            return false;
+        }
+    }
+
     public void Load(ProgramNode program)
     {
         foreach (var function in program.Statements.OfType<FunctionDeclStmt>())

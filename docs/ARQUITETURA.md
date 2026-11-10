@@ -1,6 +1,6 @@
 # Arquitetura da VelvX Engine
 
-Este documento descreve como a versão **0.2.0 (Forja)** está organizada e quais são os pontos de extensão para as próximas etapas.
+Este documento descreve como a versão **0.3.0 (Bigorna)** está organizada e quais são os pontos de extensão para as próximas etapas.
 
 ## Visão geral
 
@@ -15,9 +15,10 @@ Editor (EditorWindow)
   ├─ Hierarquia      objetos, cenas carregadas, busca e criação
   ├─ Viewport 3D     WPF Viewport3D, câmera orbital + WASD, gizmos
   ├─ Viewport 2D     desenho vetorial, sprites, GIFs e spritesheets
-  ├─ Inspector       transformação, aparência, assets, luz, volume,
-  │                  componentes e script do objeto
+  ├─ Inspector       transformação, hierarquia, camada, aparência, assets,
+  │                  luz, volume, câmera, componentes e script do objeto
   ├─ Script          AvalonEdit + realce da VelvX + ajuda
+  ├─ Script grande   ScriptEditorWindow com autocomplete e auto-indent
   ├─ Recursos        cenas, scripts, assets e prefabs
   └─ Saída           console do jogo + FPS
            │
@@ -27,14 +28,17 @@ Configurações do Projeto (ProjectSettingsWindow)
   ├─ Entradas        ações e teclas personalizadas
   ├─ Renderização    limite de FPS, contador, sombreamento
   ├─ Iluminação      ambiente, sol, fundo, neblina
-  └─ Cenas           lista de cenas e streaming
+  ├─ Cenas           lista de cenas e streaming
+  └─ Camadas e scripts  camadas, matriz de colisão e scripts globais
            │
            ▼
 Runtime (GameSession)
   ├─ Parser / Interpreter da VelvX
   ├─ InputState + InputMap do projeto
   ├─ SceneManager    cenas carregadas, ativa, load/unload/set_active
-  ├─ Componentes     scripts por objeto e Rotator/PointLight nativos
+  ├─ Componentes     scripts por objeto, Rotator/PointLight nativos,
+  │                  colliders, rigidbody, câmera e áudio
+  ├─ Física          integração simples, AABB e triggers
   └─ ponte cena ↔ objetos de script
 ```
 
@@ -70,26 +74,33 @@ O `.velvxproj` guarda:
 - `entryScript` e `startScene`;
 - `scenes`: entradas `{ name, path, start }`;
 - `inputs.actions`: `{ name, keys[] }`;
-- `render`: `fpsLimit`, `showFps`, `smoothShading`.
+- `render`: `fpsLimit`, `showFps`, `smoothShading`;
+- `layers` e `collisionDisabled` (pares `A|B` que não colidem);
+- `globalScripts`: scripts executados para todos os objetos.
 
 Lista de recentes: `%LOCALAPPDATA%\VelvX\recent-projects.json`.
 Projetos novos por padrão: `%USERPROFILE%\Documents\VelvX Projects`.
 
 ### Formato da cena
 
-Cada cena tem `name`, `mode`, `environment` e `objects`. Cada objeto tem `id`, `name`, `type`, `position`, `rotation`, `scale`, `color` e, opcionalmente:
+Cada cena tem `name`, `mode`, `environment` e `objects`. Cada objeto tem `id`, `name`, `type`, `position`, `rotation`, `scale`, `color`, `layer` e, opcionalmente:
 
+- `parentId` (hierarquia);
 - `size` (2D);
 - `script` (script do objeto);
-- `model`, `animation`, `animationSpeed`, `animationLoop` (Model3D);
+- `model`, `modelTexture`, `modelScale`, `animation`, `animationSpeed`, `animationLoop` (Model3D);
 - `sprite` (path, columns, rows, fps, loop);
 - `intensity`, `range` (luzes e volumes);
-- `components`: lista de `{ type, ... }` com `Enabled`, `Color`, `Amount`, `Range`, `Axis`, `Speed`, `Script`, etc.
+- `fov`, `nearPlane`, `farPlane`, `cameraActive` (câmeras);
+- `components`: lista de `{ type, ... }` com `Enabled`, `Color`, `Amount`, `Range`, `Axis`, `Speed`, `Script`, `Shape`, `Trigger`, `Mass`, `Gravity`, `UseGravity`, `LayerMask`, `Volume`, `Loop`, `Fov`, `NearPlane`, `FarPlane`, etc.
 
 Tipos principais:
 
+- Genérico: `GameObject`/`Empty` — só Transform, usado como pai, marcador ou contêiner de componentes.
 - 3D: `Box`, `Sphere`, `Model3D`, `CharacterBody3D`, `PointLight`, `DirectionalLight`, `GlobalVolume`, `BoxVolume`, `Camera3D`.
 - 2D: `Rectangle`, `Ellipse`, `Sprite`, `CharacterBody2D`, `GlobalVolume`, `BoxVolume`, `Camera2D`.
+
+Todo objeto tem transformação e pode receber componentes; o Transform é a base da hierarquia.
 
 ## Templates
 
@@ -112,19 +123,30 @@ Valores em tempo de execução: `null`, `bool`, `double`, `string`, `VelvVector2
 
 Limites de proteção: profundidade de chamadas 64; laços `while` até 500.000 iterações por execução.
 
-O realce de sintaxe fica em `Language/VelvXHighlighting.cs` (definição XSHD embutida, carregada no AvalonEdit).
+O realce de sintaxe fica em `Language/VelvXHighlighting.cs` (definição XSHD embutida, carregada no AvalonEdit). A janela grande de script (`Windows/ScriptEditorWindow.xaml`) usa o mesmo realce, com `CompletionWindow` para autocomplete, estratégia de indentação de 4 espaços, lista de scripts do projeto e referência rápida com trechos clicáveis.
 
 ## Ponte cena ↔ script
 
-`GameSession` cria um `ScriptObject` para cada objeto da cena, espelhando `position`, `rotation`, `scale`, `visible`, o componente `CharacterBody3D`/`CharacterBody2D` e os componentes declarados. A cada quadro:
+`GameSession` cria um `ScriptObject` para cada objeto da cena, espelhando `position`, `rotation`, `scale`, `visible`, `layer`, o componente `CharacterBody3D`/`CharacterBody2D` e os componentes declarados. A cada quadro:
 
 1. tira um snapshot das posições;
-2. executa `InGame()` e os scripts de componente;
+2. executa os scripts globais, `InGame()` e os scripts de componente;
 3. integra a `velocity` do jogador quando a posição não foi alterada manualmente;
 4. aplica posições de volta aos objetos e dispara `SceneObjectChanged` para o editor;
-5. executa componentes nativos (como o `Rotator`) e atualiza o gerenciador de cenas.
+5. executa componentes nativos (como o `Rotator`), a física e os triggers, e atualiza o gerenciador de cenas.
 
 O jogador é o objeto cujo `script` é o `EntryScript` do projeto; se não houver, o primeiro `CharacterBody`; se não houver, o primeiro objeto.
+
+### Hierarquia em scripts
+
+- `get_parent()`, `get_children()` e `find_child("Nome")` navegam pela árvore de `parentId`;
+- `is_child_of(outro)` verifica ancestralidade;
+- o inspetor permite escolher o pai sem criar ciclos;
+- a hierarquia visual do editor ainda lista os objetos de forma plana; o aninhamento visual fica para a 0.4.
+
+### Física, colliders e triggers
+
+`BoxCollider` e `SphereCollider` contribuem com AABBs. `Rigidbody` integra gravidade e velocidade; `CharacterBody` move por `velocity`. Quando dois colliders se cruzam e as camadas colidem, o runtime dispara `OnTriggerEnter`, `OnTriggerStay` e `OnTriggerExit` nos scripts dos objetos envolvidos. A matriz é configurada em **Configurações do Projeto → Camadas e scripts** (lista `A|B` para pares que não colidem).
 
 ## Cenas e streaming
 
@@ -142,13 +164,20 @@ O jogador é o objeto cujo `script` é o `EntryScript` do projeto; se não houve
 - O laço roda em um `DispatcherTimer` no intervalo do limite de FPS; `game.delta_time` é limitado a 0,1 s para evitar saltos.
 - Input: `Window.PreviewKeyDown/Up` alimenta `InputState`; durante o Play qualquer tecla é encaminhada ao jogo e `Esc` encerra.
 - Câmera 3D: órbita com botão direito, pan com o botão do meio, zoom com scroll, `WASD`/setas para mover, `E`/`Q` para subir/descer, `Shift` para acelerar, `F` ou **Focar** para centralizar no objeto.
-- Gizmos: projeção dos eixos X/Y/Z para a tela, teste de acerto por segmento e arraste convertido em unidades por pixel. `Ctrl`/`Shift` aplicam snap.
+- Câmeras de jogo: `Camera3D`/`Camera2D` (ou o componente `Camera`) com FOV, near, far e **câmera principal**; uma única câmera é marcada como principal e o Play usa sua transformação.
+- Gizmos: projeção dos eixos X/Y/Z para a tela a partir da posição do objeto, teste de acerto por segmento e arraste convertido em unidades por pixel. `Ctrl`/`Shift` aplicam snap.
+- Seleção: o viewport faz hit-test no modelo visual e nos componentes, selecionando o objeto clicado.
 - 2D: clique esquerdo seleciona, setas X/Y movem o objeto, botão direito/meio move a vista e scroll dá zoom; sprites, GIFs e spritesheets são desenhados com `CroppedBitmap`.
-- Recursos: a árvore é montada a partir das pastas do projeto; arrastar um objeto para `Prefabs` grava um `.prefab.json` e arrastar o prefab para a cena cria uma cópia.
+- Recursos: a árvore é montada a partir das pastas do projeto, com ícones por tipo; arrastar um objeto para `Prefabs` grava um `.prefab.json` e arrastar o prefab para a cena cria uma cópia.
+- Textos de botões usam `MinHeight` + `Padding` em vez de altura fixa, evitando corte vertical em fontes maiores.
 
 ## Renderização 3D
 
-`Rendering/ModelLoader.cs` usa Assimp para importar OBJ/FBX/GLTF/GLB, monta materiais com texturas, aplica skinning por CPU e amostra animações de nós/esqueleto por tempo. O `Scene3DView` converte modelos e formas primitivas em `ModelVisual3D`, aplica o ambiente da cena (`EnvironmentSettings`), mistura o tom do `GlobalVolume`, adiciona luzes pontuais de objetos/componentes e anima o componente `Rotator` no editor.
+`Rendering/ModelLoader.cs` usa Assimp para importar OBJ/FBX/GLTF/GLB, monta materiais com texturas, aplica skinning por CPU e amostra animações de nós/esqueleto por tempo. O `Scene3DView` converte modelos e formas primitivas em `ModelVisual3D`, aplica o ambiente da cena (`EnvironmentSettings`), mistura o tom do `GlobalVolume`, adiciona luzes pontuais de objetos/componentes e anima o componente `Rotator` no editor. `MeshRenderer` permite caixa/esfera/modelo com cor, escala e textura sem criar um objeto `Model3D` separado.
+
+## Scripts globais
+
+Scripts listados em **Configurações do Projeto → Camadas e scripts** rodam uma vez por quadro no escopo global do runtime, antes dos scripts dos objetos. Eles são úteis para regras de jogo, HUD, spawns e temporizadores. Um objeto também pode receber o componente `GlobalScript` para indicar que aquele script deve ser tratado como global.
 
 ## Execução headless
 
@@ -167,10 +196,13 @@ O código de saída é `0` em sucesso e `1` em erro. Sem `--scene`, é criada um
 
 ## Próximas etapas sugeridas
 
-1. Exportação de jogo independente (executável do jogo sem o editor).
-2. Física e colisão para `CharacterBody2D/3D` e corpos rígidos.
-3. Áudio, animação com blending e tilemaps.
-4. Editor de assets (materiais, atlas, animação) e câmera de jogo.
-5. Compilador VelvX para bytecode, com diagnóstico mais rico.
-6. Sistema de pacotes/projetos e builds incrementais.
-7. CI no GitHub Actions para compilar e anexar o zip automaticamente a cada release.
+1. Sistema de UI (HUD, botões, textos e imagens) dentro do runtime.
+2. Matriz de colisão visual, em vez de lista de pares, e hierarquia aninhada no editor.
+3. Jogo de exemplo completo para demonstrar o fluxo de criação.
+4. Exportação de jogo independente (executável do jogo sem o editor).
+5. Física mais completa para `CharacterBody2D/3D`, raycasts e corpos rígidos.
+6. Áudio, animação com blending e tilemaps.
+7. Editor de assets (materiais, atlas, animação) e câmera de jogo avançada.
+8. Compilador VelvX para bytecode, com diagnóstico mais rico.
+9. Sistema de pacotes/projetos e builds incrementais.
+10. CI no GitHub Actions para compilar e anexar o zip automaticamente a cada release.

@@ -1,0 +1,11 @@
+## Ponto de entrada do jogo.
+## Main() roda uma vez; InGame() roda a cada quadro.
+
+func Main()
+{
+    console.show("VelvX 2D pronta. Adicione sprites pelo menu de objetos!");
+}
+
+func InGame()
+{
+}

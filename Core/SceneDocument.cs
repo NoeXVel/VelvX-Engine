@@ -71,6 +71,7 @@ public sealed class SceneDocument
             "Camera3D" or "Camera2D" => "camera",
             "GlobalVolume" => "global_volume",
             "BoxVolume" => "box_volume",
+            "GameObject" or "Empty" => "object",
             "Model3D" => "model",
             "Sprite" => "sprite",
             _ => type.ToLowerInvariant()
@@ -93,6 +94,7 @@ public sealed class SceneDocument
             "PointLight" => "Luz pontual",
             "Camera3D" => "Câmera 3D",
             "Camera2D" => "Câmera 2D",
+            "GameObject" or "Empty" => "Objeto",
             "Rectangle" => "Retângulo",
             "Ellipse" => "Círculo",
             "Sprite" => "Sprite",
@@ -124,6 +126,12 @@ public sealed class SceneDocument
 
         switch (type)
         {
+            case "GameObject":
+            case "Empty":
+                item.Type = "GameObject";
+                item.Name = NewName("GameObject", item.Name);
+                item.Color = is2D ? "#7F6AE8" : "#A98BFF";
+                break;
             case "CharacterBody3D":
                 item.Scale = [1, 1.8, 1];
                 break;
@@ -158,6 +166,14 @@ public sealed class SceneDocument
             case "GlobalVolume":
                 item.Color = "#6B5AA8";
                 item.Intensity = 1;
+                break;
+            case "Camera3D":
+                item.Position = [0, 3, 8];
+                item.Rotation = [-12, 0, 0];
+                item.Fov = 60;
+                break;
+            case "Camera2D":
+                item.Position = [0, 0, 0];
                 break;
             case "BoxVolume":
                 item.Color = "#5A3FA0";
@@ -207,6 +223,8 @@ public sealed class SceneObject
     public string? Tag { get; set; }
 
     public string? Model { get; set; }
+    public string? ModelTexture { get; set; }
+    public double ModelScale { get; set; } = 1;
     public string? Animation { get; set; }
     public double AnimationSpeed { get; set; } = 1;
     public bool AnimationLoop { get; set; } = true;
@@ -216,6 +234,28 @@ public sealed class SceneObject
 
     public double Intensity { get; set; } = 1;
     public double Range { get; set; } = 8;
+
+    /// <summary>Objeto pai na hierarquia. Vazio significa raiz da cena.</summary>
+    public string? ParentId { get; set; }
+
+    /// <summary>Camada usada pela matriz de colisão do projeto.</summary>
+    public string Layer { get; set; } = "Default";
+
+    public double Fov { get; set; } = 55;
+    public double NearPlane { get; set; } = 0.2;
+    public double FarPlane { get; set; } = 1200;
+    public bool CameraActive { get; set; } = true;
+
+    [JsonIgnore]
+    public bool IsGameObject => Type is "GameObject" or "Empty";
+
+    public ComponentData? GetComponent(string type) => Components.FirstOrDefault(component =>
+        string.Equals(component.Type, type, StringComparison.OrdinalIgnoreCase));
+
+    public bool HasComponent(string type) => GetComponent(type) is not null;
+
+    public ComponentData? GetCameraComponent() =>
+        GetComponent("Camera") is { Enabled: true } camera ? camera : null;
 
     public double X => Position.Length > 0 ? Position[0] : 0;
     public double Y => Position.Length > 1 ? Position[1] : 0;
@@ -236,6 +276,7 @@ public sealed class SceneObject
     [JsonIgnore]
     public string Glyph => Type switch
     {
+        "GameObject" or "Empty" => "○",
         "CharacterBody3D" => "◆",
         "CharacterBody2D" => "◆",
         "DirectionalLight" => "☀",
@@ -257,6 +298,11 @@ public sealed class SceneObject
         Position ??= [0, 0, 0];
         Rotation ??= [0, 0, 0];
         Scale ??= [1, 1, 1];
+        if (string.IsNullOrWhiteSpace(Layer)) Layer = "Default";
+        if (ModelScale <= 0.0001) ModelScale = 1;
+        if (Fov is <= 1 or >= 179) Fov = 55;
+        if (NearPlane <= 0.001) NearPlane = 0.2;
+        if (FarPlane <= NearPlane) FarPlane = 1200;
         if (Sprite is not null)
         {
             if (Sprite.Columns < 1) Sprite.Columns = 1;
@@ -280,12 +326,20 @@ public sealed class SceneObject
         Visible = Visible,
         Tag = Tag,
         Model = Model,
+        ModelTexture = ModelTexture,
+        ModelScale = ModelScale,
         Animation = Animation,
         AnimationSpeed = AnimationSpeed,
         AnimationLoop = AnimationLoop,
         Sprite = Sprite?.Clone(),
         Components = Components.Select(component => component.Clone()).ToList(),
         Intensity = Intensity,
-        Range = Range
+        Range = Range,
+        ParentId = ParentId,
+        Layer = Layer,
+        Fov = Fov,
+        NearPlane = NearPlane,
+        FarPlane = FarPlane,
+        CameraActive = CameraActive
     };
 }

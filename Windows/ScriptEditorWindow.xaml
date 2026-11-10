@@ -1,0 +1,144 @@
+<Window x:Class="VelvX.Engine.Windows.ScriptEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:avalonedit="http://icsharpcode.net/sharpdevelop/avalonedit"
+        Title="Editor de script — VelvX"
+        Height="780" Width="1280" MinHeight="520" MinWidth="920"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource EditorBg}"
+        Foreground="{StaticResource Text}"
+        FontFamily="Segoe UI"
+        UseLayoutRounding="True"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Closing="Window_Closing">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="54" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="28" />
+    </Grid.RowDefinitions>
+
+    <Border Background="#11131A" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
+      <DockPanel Margin="16,0">
+        <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="EDITOR DE SCRIPT" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Border Background="#1B1E27" CornerRadius="5" Padding="8,3" Margin="10,0,0,0" VerticalAlignment="Center">
+              <TextBlock x:Name="FileNameText" Text="Main.velv" FontSize="10.5" Foreground="#B7ADCF" />
+            </Border>
+            <TextBlock x:Name="DirtyText" Text="" FontSize="10" Foreground="{StaticResource Warning}" VerticalAlignment="Center" Margin="8,0,0,0" />
+          </StackPanel>
+          <TextBlock x:Name="FilePathText" Text="" FontSize="9.5" Foreground="#6F7382" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" MaxWidth="620" />
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button Style="{StaticResource GhostButton}" Content="Abrir" Padding="10,6" FontSize="11" Click="Open_Click" Margin="0,0,6,0" />
+          <Button Style="{StaticResource GhostButton}" Content="Salvar" Padding="10,6" FontSize="11" Click="Save_Click" Margin="0,0,6,0" ToolTip="Ctrl+S" />
+          <Button Style="{StaticResource GhostButton}" Content="Salvar como…" Padding="10,6" FontSize="11" Click="SaveAs_Click" Margin="0,0,12,0" />
+          <Button Style="{StaticResource PrimaryButton}" Content="Concluir" Padding="14,7" FontSize="11.5" Click="Close_Click" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="222" />
+        <ColumnDefinition Width="5" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="5" />
+        <ColumnDefinition Width="308" />
+      </Grid.ColumnDefinitions>
+
+      <Border Background="{StaticResource PanelDeep}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
+        <Grid Margin="10,12,10,10">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <TextBlock Text="SCRIPTS DO PROJETO" Style="{StaticResource SectionLabel}" />
+          <ListBox x:Name="ScriptList" Grid.Row="1" Margin="0,6,0,0" MouseDoubleClick="ScriptList_MouseDoubleClick"
+                   DisplayMemberPath="." BorderThickness="0" Background="#0D0F14" />
+          <Border Grid.Row="2" Background="#171A22" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="7" Padding="8,7" Margin="0,8,0,0">
+            <TextBlock Text="Dois cliques abrem o script. Use Ctrl+Espaço para autocompletar." FontSize="9" Foreground="#8A8E9E" TextWrapping="Wrap" LineHeight="13" />
+          </Border>
+        </Grid>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#0A0B10" ShowsPreview="False" />
+
+      <Border Grid.Column="2" Background="#0E1015" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
+        <avalonedit:TextEditor x:Name="Editor"
+                               Background="#0E1015" Foreground="#DDD8EE"
+                               FontFamily="Cascadia Mono, Consolas" FontSize="13.5"
+                               ShowLineNumbers="True"
+                               Padding="10,9"
+                               HorizontalScrollBarVisibility="Auto"
+                               VerticalScrollBarVisibility="Auto"
+                               WordWrap="False" />
+      </Border>
+
+      <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="#0A0B10" ShowsPreview="False" />
+
+      <Border Grid.Column="4" Background="{StaticResource PanelDeep}" BorderBrush="{StaticResource Line}" BorderThickness="1,0,0,0">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,12">
+          <StackPanel>
+            <TextBlock Text="REFERÊNCIA RÁPIDA" Style="{StaticResource SectionLabel}" />
+            <TextBlock Text="Clique em um trecho para inserir no cursor." FontSize="9.5" Foreground="#7A7E8E" Margin="0,0,0,10" TextWrapping="Wrap" />
+
+            <TextBlock Text="CICLO DE VIDA" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,2,0,4" />
+            <TextBlock Text="func Main()  → roda uma vez" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="func InGame() → a cada quadro" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="this → objeto do componente" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,8" />
+            <Button Style="{StaticResource GhostButton}" Content="Inserir Main + InGame" Tag="lifecycle" Click="InsertSnippet_Click" Padding="8,5" FontSize="10" HorizontalContentAlignment="Left" Margin="0,0,0,10" />
+
+            <TextBlock Text="ENTRADA" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,4" />
+            <TextBlock Text="game.get_input(&quot;pular&quot;)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="game.get_input_vectors(...)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="game.delta_time" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,8" />
+            <Button Style="{StaticResource GhostButton}" Content="Inserir get_input" Tag="input" Click="InsertSnippet_Click" Padding="8,5" FontSize="10" HorizontalContentAlignment="Left" Margin="0,0,0,10" />
+
+            <TextBlock Text="CENAS / STREAMING" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,4" />
+            <TextBlock Text="Scene(&quot;Fase 2&quot;).load()" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="Scene(&quot;Fase 1&quot;).unload()" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="Scenes.set_active(&quot;Fase 2&quot;)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,8" />
+            <Button Style="{StaticResource GhostButton}" Content="Inserir streaming" Tag="streaming" Click="InsertSnippet_Click" Padding="8,5" FontSize="10" HorizontalContentAlignment="Left" Margin="0,0,0,10" />
+
+            <TextBlock Text="HIERARQUIA" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,4" />
+            <TextBlock Text="get_parent() / get_children()" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="get_child(&quot;Nome&quot;) / find_child(&quot;Nome&quot;)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" TextWrapping="Wrap" />
+            <TextBlock Text="is_child_of(&quot;Pai&quot;)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,8" />
+            <Button Style="{StaticResource GhostButton}" Content="Inserir hierarquia" Tag="hierarchy" Click="InsertSnippet_Click" Padding="8,5" FontSize="10" HorizontalContentAlignment="Left" Margin="0,0,0,10" />
+
+            <TextBlock Text="TRIGGERS E COLISÃO" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,4" />
+            <TextBlock Text="func OnTriggerEnter(other)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="func OnTriggerStay(other)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="func OnTriggerExit(other)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,8" />
+            <Button Style="{StaticResource GhostButton}" Content="Inserir callbacks de trigger" Tag="trigger" Click="InsertSnippet_Click" Padding="8,5" FontSize="10" HorizontalContentAlignment="Left" Margin="0,0,0,10" />
+
+            <TextBlock Text="OBJETOS E CONSOLE" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,4" />
+            <TextBlock Text="Assets.pathObject(&quot;Player&quot;)" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="console.show / warn / error" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,10" />
+
+            <TextBlock Text="SINTAXE" FontSize="9" FontWeight="Bold" Foreground="#757A8A" Margin="0,0,0,4" />
+            <TextBlock Text="var nome: Tipo = valor" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="if / else / while / return" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" />
+            <TextBlock Text="## comentário" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#8EE3A8" />
+            <TextBlock Text="Vector2, Vector3, math" FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#D8D4E4" Margin="0,0,0,10" />
+
+            <Border Background="#171A22" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="7" Padding="9,8">
+              <TextBlock Text="Scripts globais e camadas são configurados em Projeto → Configurações → Camadas e scripts globais. Um script global roda uma vez por quadro, sem objeto vinculado." FontSize="9.5" Foreground="#9A9EAD" TextWrapping="Wrap" LineHeight="14" />
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="2" Background="#0A0B10" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0">
+      <DockPanel Margin="14,0" LastChildFill="False">
+        <TextBlock x:Name="CursorText" Text="Ln 1, Col 1" FontSize="9.5" Foreground="#6F7382" VerticalAlignment="Center" />
+        <TextBlock x:Name="StatsText" Text="" FontSize="9.5" Foreground="#6F7382" VerticalAlignment="Center" Margin="18,0,0,0" />
+        <TextBlock DockPanel.Dock="Right" Text="Ctrl+Espaço autocompletar · Enter auto-indenta · Ctrl+S salvar" FontSize="9.5" Foreground="#5E6372" VerticalAlignment="Center" />
+      </DockPanel>
+    </Border>
+  </Grid>
+</Window>

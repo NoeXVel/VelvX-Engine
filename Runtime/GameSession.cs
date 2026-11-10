@@ -12,6 +12,9 @@ public sealed class GameSession : IScriptHost
 {
     private readonly Dictionary<string, SceneInstance> _scenes = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ComponentScript> _componentScripts = [];
+    private readonly List<GlobalScript> _globalScripts = [];
+    private readonly Dictionary<string, VelvVector3> _bodyVelocities = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, TriggerPair> _triggerPairs = new(StringComparer.OrdinalIgnoreCase);
     private readonly ScriptObject _sceneRoot;
     private readonly ScriptObject _this;
     private readonly ScriptObject? _playerComponent;
@@ -101,6 +104,7 @@ public sealed class GameSession : IScriptHost
         _interpreter.SetDeltaTime(_deltaTime);
         _interpreter.RunMain();
 
+        StartGlobalScripts();
         StartComponentScripts();
         _started = true;
         Started?.Invoke();
@@ -114,12 +118,17 @@ public sealed class GameSession : IScriptHost
         _interpreter.SetDeltaTime(_deltaTime);
         foreach (var component in _componentScripts)
             component.Interpreter.SetDeltaTime(_deltaTime);
+        foreach (var global in _globalScripts)
+            global.Interpreter.SetDeltaTime(_deltaTime);
 
         var before = SnapshotTransforms();
         _interpreter.RunInGame();
         RunComponentScripts();
+        RunGlobalScripts();
         ApplyTransforms(before);
         ApplyNativeComponents();
+        ApplyPhysics();
+        UpdateTriggers();
         UpdateSceneManager();
     }
 
@@ -128,6 +137,9 @@ public sealed class GameSession : IScriptHost
         if (!_started) return;
         _started = false;
         _componentScripts.Clear();
+        _globalScripts.Clear();
+        _bodyVelocities.Clear();
+        _triggerPairs.Clear();
         Stopped?.Invoke();
     }
 
@@ -283,7 +295,105 @@ public sealed class GameSession : IScriptHost
 
         var instance = new SceneInstance(key, path, document, root, bindings, objects);
         _scenes[key] = instance;
+        BindHierarchy(instance);
         return instance;
+    }
+
+    /// <summary>Liga parent/children para navegação de hierarquia nos scripts.</summary>
+    private void BindHierarchy(SceneInstance instance)
+    {
+        foreach (var item in instance.Document.Objects)
+        {
+            if (!instance.Objects.TryGetValue(item.Id, out var self)) continue;
+
+            var parent = item.ParentId is null
+                ? null
+                : instance.Document.Objects.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Id, item.ParentId, StringComparison.OrdinalIgnoreCase));
+            ScriptObject? parentObject = null;
+            if (parent is not null) instance.Objects.TryGetValue(parent.Id, out parentObject);
+
+            self.Set("parent_id", parent?.Id ?? "");
+            self.Set("parent_name", parentObject?.Name ?? "");
+            self.Set("get_parent", new NativeFunction("get_parent", _ => parentObject));
+            self.Set("get_children", new NativeFunction("get_children", _ =>
+                CreateChildrenList(instance, item.Id)));
+            self.Set("get_child", new NativeFunction("get_child", arguments =>
+                arguments.Count == 0
+                    ? null
+                    : FindChild(instance, item.Id, ToText(arguments[0]), recursive: false)));
+            self.Set("find_child", new NativeFunction("find_child", arguments =>
+                arguments.Count == 0
+                    ? null
+                    : FindChild(instance, item.Id, ToText(arguments[0]), recursive: true)));
+            self.Set("is_child_of", new NativeFunction("is_child_of", arguments =>
+            {
+                if (arguments.Count == 0) return false;
+                var current = parent;
+                var guard = 0;
+                while (current is not null && guard++ < 64)
+                {
+                    if (string.Equals(current.Id, ToText(arguments[0]), StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(current.Name, ToText(arguments[0]), StringComparison.OrdinalIgnoreCase))
+                        return true;
+                    current = current.ParentId is null
+                        ? null
+                        : instance.Document.Objects.FirstOrDefault(candidate =>
+                            string.Equals(candidate.Id, current.ParentId, StringComparison.OrdinalIgnoreCase));
+                }
+                return false;
+            }));
+        }
+    }
+
+    private static ScriptObject CreateChildrenList(SceneInstance instance, string parentId)
+    {
+        var children = instance.Document.Objects
+            .Where(item => string.Equals(item.ParentId, parentId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var list = new ScriptObject("children", "Children");
+        list.Set("count", children.Count);
+        list.Set("names", string.Join(", ", children.Select(child => child.Name)));
+        list.Set("get", new NativeFunction("get", arguments =>
+        {
+            if (arguments.Count == 0) return null;
+            var value = arguments[0] switch
+            {
+                double number => number,
+                float number => number,
+                int number => number,
+                _ => double.TryParse(ToText(arguments[0]), out var parsed) ? parsed : 0
+            };
+            var index = (int)Math.Floor(value);
+            if (index < 0 || index >= children.Count) return null;
+            return instance.Objects.TryGetValue(children[index].Id, out var child) ? child : null;
+        }));
+        return list;
+    }
+
+    private static ScriptObject? FindChild(SceneInstance instance, string parentId, string idOrName, bool recursive)
+    {
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        return FindChildRecursive(instance, parentId, idOrName, recursive, visited);
+    }
+
+    private static ScriptObject? FindChildRecursive(
+        SceneInstance instance, string parentId, string idOrName, bool recursive, HashSet<string> visited)
+    {
+        if (!visited.Add(parentId)) return null;
+        foreach (var item in instance.Document.Objects)
+        {
+            if (!string.Equals(item.ParentId, parentId, StringComparison.OrdinalIgnoreCase)) continue;
+            if (string.Equals(item.Id, idOrName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(item.Name, idOrName, StringComparison.OrdinalIgnoreCase))
+                return instance.Objects.TryGetValue(item.Id, out var found) ? found : null;
+
+            if (!recursive) continue;
+            var nested = FindChildRecursive(instance, item.Id, idOrName, true, visited);
+            if (nested is not null) return nested;
+        }
+        return null;
     }
 
     private SceneInstance? FindScene(string nameOrPath)
@@ -442,7 +552,8 @@ public sealed class GameSession : IScriptHost
             {
                 var scripts = new List<string>();
                 if (!string.IsNullOrWhiteSpace(item.Script) &&
-                    !string.Equals(item.Script, _project?.Info.EntryScript, StringComparison.OrdinalIgnoreCase))
+                    !string.Equals(item.Script, _project?.Info.EntryScript, StringComparison.OrdinalIgnoreCase) &&
+                    !IsGlobalScript(item.Script))
                     scripts.Add(item.Script);
 
                 foreach (var component in item.Components)
@@ -450,12 +561,74 @@ public sealed class GameSession : IScriptHost
                     if (!component.Enabled || !string.Equals(component.Type, "Script", StringComparison.OrdinalIgnoreCase))
                         continue;
                     if (!string.IsNullOrWhiteSpace(component.Script) &&
+                        !IsGlobalScript(component.Script) &&
                         !scripts.Contains(component.Script, StringComparer.OrdinalIgnoreCase))
                         scripts.Add(component.Script);
                 }
 
                 foreach (var scriptPath in scripts)
                     TryStartComponentScript(scene, item, scriptPath);
+            }
+        }
+    }
+
+    private bool IsGlobalScript(string? path)
+    {
+        if (_project is null || string.IsNullOrWhiteSpace(path)) return false;
+        var normalized = path.Replace('\\', '/');
+        return _project.Info.GlobalScripts.Any(global =>
+            string.Equals(global.Replace('\\', '/'), normalized, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void StartGlobalScripts()
+    {
+        if (_project is null) return;
+
+        foreach (var scriptPath in _project.Info.GlobalScripts)
+        {
+            var resolved = _project.ResolveAsset(scriptPath);
+            if (!File.Exists(resolved))
+            {
+                Output?.Invoke($"Script global '{scriptPath}' não encontrado.", ScriptLogLevel.Warning);
+                continue;
+            }
+
+            try
+            {
+                var manager = new ScriptObject(Path.GetFileNameWithoutExtension(scriptPath), "Global");
+                manager.Set("id", Path.GetFileNameWithoutExtension(scriptPath));
+                manager.Set("scene", SceneRoot);
+                var host = new ComponentHost(this, manager, "Global", Path.GetFileName(scriptPath));
+                var interpreter = new Interpreter(host);
+                interpreter.Load(Parser.Parse(File.ReadAllText(resolved)));
+                interpreter.SetDeltaTime(_deltaTime);
+                if (interpreter.HasFunction("Main")) interpreter.RunMain();
+                _globalScripts.Add(new GlobalScript(interpreter, scriptPath));
+                Output?.Invoke($"Script global '{Path.GetFileName(scriptPath)}' iniciado.", ScriptLogLevel.Info);
+            }
+            catch (Exception exception)
+            {
+                var message = exception is VelvXException velvx ? velvx.FriendlyMessage : exception.Message;
+                Output?.Invoke($"Erro no script global '{Path.GetFileName(scriptPath)}': {message}", ScriptLogLevel.Error);
+            }
+        }
+    }
+
+    private void RunGlobalScripts()
+    {
+        for (var index = _globalScripts.Count - 1; index >= 0; index--)
+        {
+            var global = _globalScripts[index];
+            try
+            {
+                global.Interpreter.RunInGame();
+            }
+            catch (Exception exception)
+            {
+                var message = exception is VelvXException velvx ? velvx.FriendlyMessage : exception.Message;
+                Output?.Invoke($"Erro no script global '{Path.GetFileName(global.ScriptPath)}': {message}",
+                    ScriptLogLevel.Error);
+                _globalScripts.RemoveAt(index);
             }
         }
     }
@@ -593,6 +766,202 @@ public sealed class GameSession : IScriptHost
     private void UpdateSceneManager()
     {
         _sceneManager.Set("current", ActiveSceneName ?? "");
+    }
+
+    // ── Física básica, colliders e triggers ─────────────────────────────────
+
+    private void ApplyPhysics()
+    {
+        foreach (var scene in _scenes.Values)
+        {
+            foreach (var item in scene.Document.Objects)
+            {
+                if (!item.Visible) continue;
+                var body = item.GetComponent("Rigidbody");
+                if (body is not { Enabled: true }) continue;
+
+                var key = $"{scene.Key}/{item.Id}";
+                if (!_bodyVelocities.TryGetValue(key, out var velocity))
+                    velocity = new VelvVector3(0, 0, 0);
+
+                if (body.UseGravity)
+                    velocity.Y -= Math.Max(0, body.Gravity) * _deltaTime;
+
+                var ground = GroundHeight(scene, item);
+                var nextY = item.Y + velocity.Y * _deltaTime;
+                if (nextY <= ground && velocity.Y <= 0)
+                {
+                    nextY = ground;
+                    velocity.Y = 0;
+                }
+
+                if (Math.Abs(nextY - item.Y) > 1e-9)
+                {
+                    item.Position[1] = nextY;
+                    SyncScriptPosition(scene, item);
+                    SceneObjectChanged?.Invoke(scene.Key, item);
+                }
+                _bodyVelocities[key] = velocity;
+            }
+        }
+    }
+
+    private double GroundHeight(SceneInstance scene, SceneObject body)
+    {
+        var is3D = scene.Document.Is3D;
+        var radius = is3D
+            ? Math.Max(0.1, Math.Max(body.Scale[0], body.Scale[2]) * 0.5)
+            : Math.Max(0.1, body.Size is { Length: > 0 } ? body.Size[0] * 0.5 : body.Scale[0] * 0.5);
+
+        var ground = 0.0;
+        foreach (var other in scene.Document.Objects)
+        {
+            if (ReferenceEquals(other, body) || !other.Visible) continue;
+            if (!IsSolid(other)) continue;
+
+            var bounds = GetBounds(scene, other);
+            if (bounds.MaxY > body.Y + 0.35) continue;
+
+            if (is3D)
+            {
+                if (body.X + radius < bounds.MinX || body.X - radius > bounds.MaxX) continue;
+                if (body.Z + radius < bounds.MinZ || body.Z - radius > bounds.MaxZ) continue;
+            }
+            else
+            {
+                if (body.X + radius < bounds.MinX || body.X - radius > bounds.MaxX) continue;
+            }
+
+            ground = Math.Max(ground, bounds.MaxY);
+        }
+        return ground;
+    }
+
+    private static bool IsSolid(SceneObject item)
+    {
+        if (item.Type is "Box" or "Sphere" or "Model3D" or "CharacterBody3D" or "CharacterBody2D") return true;
+        if (item.IsGameObject && item.HasComponent("MeshRenderer")) return true;
+        return item.HasComponent("BoxCollider") || item.HasComponent("SphereCollider");
+    }
+
+    private void UpdateTriggers()
+    {
+        var colliders = new List<ColliderRef>();
+        foreach (var scene in _scenes.Values)
+        {
+            foreach (var item in scene.Document.Objects)
+            {
+                if (!item.Visible) continue;
+                if (!TryGetCollider(scene, item, out var collider)) continue;
+                colliders.Add(collider);
+            }
+        }
+
+        var current = new Dictionary<string, TriggerPair>(StringComparer.OrdinalIgnoreCase);
+        for (var first = 0; first < colliders.Count; first++)
+        {
+            for (var second = first + 1; second < colliders.Count; second++)
+            {
+                var a = colliders[first];
+                var b = colliders[second];
+                if (!ReferenceEquals(a.Scene, b.Scene)) continue;
+                if (!a.Bounds.Intersects(b.Bounds)) continue;
+                if (!a.Trigger && !b.Trigger) continue;
+                if (_project is not null && !_project.Info.LayersCollide(a.Item.Layer, b.Item.Layer)) continue;
+
+                var key = PairKey(a.Scene.Key, a.Item.Id, b.Item.Id);
+                if (_triggerPairs.ContainsKey(key))
+                {
+                    RaiseTrigger(a.Scene, a.Item, b.Item, "OnTriggerStay");
+                    RaiseTrigger(b.Scene, b.Item, a.Item, "OnTriggerStay");
+                }
+                else
+                {
+                    RaiseTrigger(a.Scene, a.Item, b.Item, "OnTriggerEnter");
+                    RaiseTrigger(b.Scene, b.Item, a.Item, "OnTriggerEnter");
+                }
+                current[key] = new TriggerPair(a.Scene.Key, a.Item.Id, b.Item.Id);
+            }
+        }
+
+        foreach (var pair in _triggerPairs.Values)
+        {
+            if (current.ContainsKey(PairKey(pair.SceneKey, pair.FirstId, pair.SecondId))) continue;
+            if (!_scenes.TryGetValue(pair.SceneKey, out var scene)) continue;
+            var first = scene.Document.Objects.FirstOrDefault(item =>
+                string.Equals(item.Id, pair.FirstId, StringComparison.OrdinalIgnoreCase));
+            var second = scene.Document.Objects.FirstOrDefault(item =>
+                string.Equals(item.Id, pair.SecondId, StringComparison.OrdinalIgnoreCase));
+            if (first is null || second is null) continue;
+            RaiseTrigger(scene, first, second, "OnTriggerExit");
+            RaiseTrigger(scene, second, first, "OnTriggerExit");
+        }
+
+        _triggerPairs.Clear();
+        foreach (var pair in current) _triggerPairs[pair.Key] = pair.Value;
+    }
+
+    private bool TryGetCollider(SceneInstance scene, SceneObject item, out ColliderRef collider)
+    {
+        collider = null!;
+        var box = item.GetComponent("BoxCollider");
+        var sphere = item.GetComponent("SphereCollider");
+        var isCharacter = item.Type is "CharacterBody3D" or "CharacterBody2D";
+
+        if (box is null && sphere is null && !isCharacter) return false;
+
+        var component = box ?? sphere;
+        var trigger = component is { Enabled: true, Trigger: true };
+        collider = new ColliderRef(scene, item, GetBounds(scene, item), trigger);
+        return true;
+    }
+
+    private static SceneBounds GetBounds(SceneInstance scene, SceneObject item)
+    {
+        if (!scene.Document.Is3D)
+        {
+            var width = item.Size is { Length: > 0 } ? Math.Max(0.05, item.Size[0]) : Math.Max(0.05, item.Scale[0]);
+            var height = item.Size is { Length: > 1 } ? Math.Max(0.05, item.Size[1]) : Math.Max(0.05, item.Scale[1]);
+            return new SceneBounds(
+                item.X - width / 2, item.Y - height / 2, -0.5,
+                item.X + width / 2, item.Y + height / 2, 0.5);
+        }
+
+        var halfX = Math.Max(0.05, item.Scale[0] * 0.5);
+        var halfZ = Math.Max(0.05, item.Scale[2] * 0.5);
+        var height3D = Math.Max(0.05, item.Scale[1]);
+        return new SceneBounds(
+            item.X - halfX, item.Y, item.Z - halfZ,
+            item.X + halfX, item.Y + height3D, item.Z + halfZ);
+    }
+
+    private void RaiseTrigger(SceneInstance scene, SceneObject item, SceneObject other, string function)
+    {
+        if (!scene.Objects.TryGetValue(other.Id, out var otherObject)) return;
+
+        foreach (var component in _componentScripts)
+        {
+            if (!ReferenceEquals(component.Scene, scene)) continue;
+            if (!string.Equals(component.Item.Id, item.Id, StringComparison.OrdinalIgnoreCase)) continue;
+            component.Interpreter.CallFunction(function, otherObject);
+        }
+
+        if (_interpreter is not null && _playerSceneObject is not null &&
+            string.Equals(_playerSceneObject.Id, item.Id, StringComparison.OrdinalIgnoreCase))
+            _interpreter.CallFunction(function, otherObject);
+    }
+
+    private static string PairKey(string sceneKey, string firstId, string secondId) =>
+        string.Compare(firstId, secondId, StringComparison.OrdinalIgnoreCase) <= 0
+            ? $"{sceneKey}|{firstId}|{secondId}"
+            : $"{sceneKey}|{secondId}|{firstId}";
+
+    private static void SyncScriptPosition(SceneInstance scene, SceneObject item)
+    {
+        if (!scene.Objects.TryGetValue(item.Id, out var scriptObject)) return;
+        scriptObject.Set("position", scene.Document.Is3D
+            ? new VelvVector3(item.X, item.Y, item.Z)
+            : (object)new VelvVector2(item.X, item.Y));
     }
 
     private TransformSnapshot IntegrateVelocity(ScriptObject scriptObject, TransformSnapshot position)
@@ -733,6 +1102,26 @@ public sealed class GameSession : IScriptHost
         SceneObject Item,
         Interpreter Interpreter,
         string ScriptPath);
+
+    private sealed record GlobalScript(Interpreter Interpreter, string ScriptPath);
+
+    private sealed record TriggerPair(string SceneKey, string FirstId, string SecondId);
+
+    private sealed record ColliderRef(
+        SceneInstance Scene,
+        SceneObject Item,
+        SceneBounds Bounds,
+        bool Trigger);
+
+    private readonly record struct SceneBounds(
+        double MinX, double MinY, double MinZ,
+        double MaxX, double MaxY, double MaxZ)
+    {
+        public bool Intersects(SceneBounds other) =>
+            MinX <= other.MaxX && MaxX >= other.MinX &&
+            MinY <= other.MaxY && MaxY >= other.MinY &&
+            MinZ <= other.MaxZ && MaxZ >= other.MinZ;
+    }
 
     private readonly record struct TransformSnapshot(
         double X, double Y, double Z,

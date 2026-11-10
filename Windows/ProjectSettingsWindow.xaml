@@ -36,6 +36,7 @@
           <Button x:Name="NavRender" Style="{StaticResource NavButton}" Content="Renderização e FPS" Click="Nav_Click" Tag="render" />
           <Button x:Name="NavEnvironment" Style="{StaticResource NavButton}" Content="Iluminação e volumes" Click="Nav_Click" Tag="environment" />
           <Button x:Name="NavScenes" Style="{StaticResource NavButton}" Content="Cenas e streaming" Click="Nav_Click" Tag="scenes" />
+          <Button x:Name="NavAdvanced" Style="{StaticResource NavButton}" Content="Camadas e scripts" Click="Nav_Click" Tag="advanced" />
           <Border Height="1" Background="{StaticResource Line}" Margin="0,12" />
           <TextBlock Text="As mudanças são gravadas no arquivo do projeto e na cena atual." FontSize="9.5" Foreground="#6F7382" TextWrapping="Wrap" LineHeight="14" />
         </StackPanel>
@@ -206,6 +207,55 @@
             </StackPanel>
             <Border Background="#171A22" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="9" Padding="12,10">
               <TextBlock x:Name="SceneHint" Text="Selecione uma cena para ver o caminho." FontSize="10" Foreground="#9A9EAD" TextWrapping="Wrap" LineHeight="15" />
+            </Border>
+          </StackPanel>
+
+          <!-- Camadas e scripts globais -->
+          <StackPanel x:Name="PanelAdvanced" Visibility="Collapsed">
+            <TextBlock Text="CAMADAS E COLISÃO" Style="{StaticResource SectionLabel}" />
+            <TextBlock Text="Objetos usam a camada definida no inspetor. Colisões entre camadas são ativadas por padrão; desative pares abaixo." FontSize="10.5" Foreground="#9A9EAD" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="218" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+
+              <StackPanel>
+                <ListBox x:Name="LayerList" Height="180" BorderThickness="0" />
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                  <Button Style="{StaticResource GhostButton}" Content="+ Camada" Padding="10,6" FontSize="11" Click="AddLayer_Click" />
+                  <Button Style="{StaticResource GhostButton}" Content="Remover" Padding="10,6" FontSize="11" Click="RemoveLayer_Click" Margin="6,0,0,0" />
+                </StackPanel>
+              </StackPanel>
+
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="PARES SEM COLISÃO" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="CollisionPairsBox" Height="120" AcceptsReturn="True" TextWrapping="Wrap"
+                         VerticalContentAlignment="Top" FontFamily="Cascadia Mono, Consolas" FontSize="11" />
+                <TextBlock Text="Um par por linha, no formato CamadaA|CamadaB. Ex.: Player|Inimigo" FontSize="9.5" Foreground="#737888" TextWrapping="Wrap" Margin="0,6,0,0" />
+              </StackPanel>
+            </Grid>
+
+            <Border Height="1" Background="{StaticResource Line}" Margin="0,20,0,16" />
+
+            <TextBlock Text="SCRIPTS GLOBAIS" Style="{StaticResource SectionLabel}" />
+            <TextBlock Text="Scripts globais rodam Main() uma vez e InGame() a cada quadro, sem depender de um objeto na cena." FontSize="10.5" Foreground="#9A9EAD" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <ListBox x:Name="GlobalScriptList" Height="150" BorderThickness="0" />
+              <StackPanel Grid.Column="2" VerticalAlignment="Top">
+                <Button Style="{StaticResource GhostButton}" Content="+ Adicionar…" Padding="10,6" FontSize="11" Click="AddGlobalScript_Click" />
+                <Button Style="{StaticResource GhostButton}" Content="Remover" Padding="10,6" FontSize="11" Click="RemoveGlobalScript_Click" Margin="0,6,0,0" />
+              </StackPanel>
+            </Grid>
+            <Border Background="#171A22" BorderBrush="#2A2D38" BorderThickness="1" CornerRadius="9" Padding="12,10" Margin="0,12,0,0">
+              <TextBlock Text="Callback de triggers: use OnTriggerEnter(other), OnTriggerStay(other) e OnTriggerExit(other) em scripts de objetos com collider marcado como gatilho." FontSize="10" Foreground="#9A9EAD" TextWrapping="Wrap" LineHeight="15" />
             </Border>
           </StackPanel>
         </Grid>

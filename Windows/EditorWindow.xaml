@@ -34,7 +34,7 @@
           <Button x:Name="MenuViewButton" Content="Janela" Tag="view" Style="{StaticResource GhostButton}" FontSize="12" Padding="11,4" Click="Menu_Click" />
           <Button x:Name="MenuHelpButton" Content="Ajuda" Tag="help" Style="{StaticResource GhostButton}" FontSize="12" Padding="11,4" Click="Menu_Click" />
         </StackPanel>
-        <TextBlock DockPanel.Dock="Right" Text="VelvX Engine 0.2.0 · Forja" FontSize="9.5" Foreground="#5E6372" VerticalAlignment="Center" />
+        <TextBlock x:Name="EngineVersionText" DockPanel.Dock="Right" Text="VelvX Engine 0.3.0 · Bigorna" FontSize="9.5" Foreground="#5E6372" VerticalAlignment="Center" />
       </DockPanel>
     </Border>
 
@@ -165,7 +165,7 @@
         <Grid.RowDefinitions>
           <RowDefinition Height="*" />
           <RowDefinition Height="5" />
-          <RowDefinition Height="310" />
+          <RowDefinition Height="336" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" Background="#0A0B10" ClipToBounds="True">
@@ -229,6 +229,7 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
                   <TextBlock x:Name="ScriptDirtyText" Text="" Foreground="{StaticResource Warning}" FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0" />
+                  <Button Style="{StaticResource GhostButton}" Content="Ampliar" Padding="8,5" FontSize="11" Click="OpenLargeScript_Click" Margin="0,0,4,0" ToolTip="Abrir o editor de script completo com autocompletar e referência" />
                   <Button Style="{StaticResource GhostButton}" Content="Ajuda" Padding="9,5" FontSize="11" Click="ToggleHelp_Click" Margin="0,0,4,0" />
                   <Button Style="{StaticResource GhostButton}" Content="Abrir" Padding="9,5" FontSize="11" Click="OpenScript_Click" Margin="0,0,4,0" ToolTip="Abrir outro script do projeto" />
                   <Button Style="{StaticResource GhostButton}" Content="Salvar" Padding="9,5" FontSize="11" Click="Save_Click" />
@@ -461,6 +462,27 @@
                 <TextBox x:Name="TagField" FontSize="11" Padding="7,4" MinHeight="26" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
               </DockPanel>
 
+              <TextBlock Text="HIERARQUIA E CAMADA" Style="{StaticResource FieldLabel}" />
+              <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="8" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock Text="OBJETO PAI" Style="{StaticResource FieldLabel}" />
+                  <Button x:Name="ParentButton" Style="{StaticResource GhostButton}" Padding="8,5" MinHeight="30"
+                          HorizontalContentAlignment="Left" Click="ParentButton_Click"
+                          ToolTip="Escolher o objeto pai deste objeto na hierarquia">
+                    <TextBlock x:Name="ParentButtonText" Text="— raiz —" FontSize="10.5" TextTrimming="CharacterEllipsis" />
+                  </Button>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                  <TextBlock Text="CAMADA" Style="{StaticResource FieldLabel}" />
+                  <TextBox x:Name="LayerField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" ToolTip="Camada usada pela matriz de colisão do projeto" />
+                </StackPanel>
+              </Grid>
+
               <!-- Específico por tipo -->
               <StackPanel x:Name="ModelPanel" Visibility="Collapsed" Margin="0,4,0,10">
                 <TextBlock Text="MODELO 3D" Style="{StaticResource FieldLabel}" />
@@ -481,6 +503,47 @@
                     <TextBox x:Name="AnimationSpeedField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
                   </StackPanel>
                   <CheckBox x:Name="AnimationLoopCheck" Grid.Column="2" Content="Repetir" Click="AnimationLoop_Click" VerticalAlignment="Bottom" Margin="0,0,0,8" />
+                </Grid>
+                <Grid Margin="0,7,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="ESCALA DO MODELO" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="ModelScaleField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" ToolTip="Multiplica o tamanho do modelo importado (1 = tamanho original)" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Text="TEXTURA (OPCIONAL)" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="ModelTextureField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" ToolTip="Imagem aplicada como textura de todos os materiais do modelo" />
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
+
+              <StackPanel x:Name="CameraPanel" Visibility="Collapsed" Margin="0,4,0,10">
+                <TextBlock Text="CÂMERA" Style="{StaticResource FieldLabel}" />
+                <CheckBox x:Name="CameraActiveCheck" Content="Usar como câmera principal no modo Play" Click="CameraActive_Click" Margin="0,0,0,8" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="7" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="7" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="FOV" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="FovField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Text="NEAR" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="NearField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="4">
+                    <TextBlock Text="FAR" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="FarField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
+                  </StackPanel>
                 </Grid>
               </StackPanel>
 
@@ -554,6 +617,7 @@
                 <TextBlock x:Name="ScriptPathText" Text="Sem script vinculado" FontSize="10" Foreground="#A9A4BD" TextTrimming="CharacterEllipsis" />
               </Border>
               <Button Style="{StaticResource GhostButton}" Content="Ir para o script" HorizontalAlignment="Left" Padding="9,6" Margin="0,8,0,0" Click="GoToScript_Click" />
+              <Button Style="{StaticResource GhostButton}" Content="Abrir no editor grande" HorizontalAlignment="Left" Padding="9,6" Margin="0,8,0,0" Click="OpenLargeScript_Click" />
 
               <Button Content="Remover objeto" Background="#2A1A1E" Foreground="#F0A0A0" Padding="10,8" Margin="0,16,0,0" Click="DeleteObject_Click" />
             </StackPanel>
@@ -577,7 +641,7 @@
           <TextBlock x:Name="StatusText" Text="PRONTO" FontSize="9.5" FontWeight="SemiBold" Foreground="#8A8E9E" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-          <TextBlock Text="VelvX Language · 0.2.0" FontSize="9.5" Foreground="#5E6372" Margin="0,0,16,0" />
+          <TextBlock x:Name="LanguageVersionText" Text="VelvX Language · 0.3.0" FontSize="9.5" Foreground="#5E6372" Margin="0,0,16,0" />
           <TextBlock x:Name="FpsText" Text="" FontSize="9.5" Foreground="#5E6372" Margin="0,0,16,0" />
           <TextBlock x:Name="StatusLineText" Text="Ln 1, Col 1" FontSize="9.5" Foreground="#5E6372" />
         </StackPanel>

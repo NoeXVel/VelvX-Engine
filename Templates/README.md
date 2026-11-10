@@ -6,8 +6,10 @@ Cada pasta aqui com um `template.json` aparece na tela **Novo projeto** do launc
 | --- | --- | --- |
 | `Starter-3D` | 3D | chão, pilares, plataforma, esfera animada, Player, luz pontual, Global Volume e streaming para a cena `Arena` |
 | `Starter-2D` | 2D | fundo, chão, plataforma, orbe GIF, estrela, spritesheet do herói, Player e streaming para `Floresta` |
+| `Empty-3D` | 3D | cenário vazio: apenas a câmera do jogo e o script de entrada |
+| `Empty-2D` | 2D | cenário vazio: apenas a câmera do jogo e o script de entrada |
 
-Os dois templates também trazem cenas de streaming, pastas de assets, um prefab de exemplo e scripts comentados com inputs personalizados.
+Os templates Starter trazem cenas de streaming, pastas de assets, um prefab de exemplo e scripts comentados com inputs personalizados. Os templates Empty são ideais para começar um jogo do zero, sem objetos de exemplo.
 
 ## Criar o seu template
 
@@ -22,7 +24,7 @@ Os dois templates também trazem cenas de streaming, pastas de assets, um prefab
   "name": "Meu template",
   "description": "Minha base de jogo personalizada.",
   "mode": "3D",
-  "version": "0.2.0"
+  "version": "0.3.0"
 }
 ```
 

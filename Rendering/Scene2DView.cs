@@ -35,6 +35,7 @@ public sealed class Scene2DView : FrameworkElement
     private readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
 
     private SceneDocument? _scene;
+    private SceneObject? _gameCamera;
     private string? _selectedId;
     private double _zoom = 56;
     private Vector _pan;
@@ -98,6 +99,13 @@ public sealed class Scene2DView : FrameworkElement
     {
         IsPlaying = playing;
         if (playing) _keys.Clear();
+        if (!playing) _gameCamera = null;
+        InvalidateVisual();
+    }
+
+    public void SetGameCamera(SceneObject? camera)
+    {
+        _gameCamera = camera;
         InvalidateVisual();
     }
 
@@ -128,6 +136,12 @@ public sealed class Scene2DView : FrameworkElement
         dc.DrawRectangle(BackgroundBrush, null, new Rect(RenderSize));
 
         var center = new Point(ActualWidth / 2 + _pan.X, ActualHeight / 2 + _pan.Y);
+        if (IsPlaying && _gameCamera is not null)
+        {
+            center = new Point(
+                ActualWidth / 2 - _gameCamera.X * _zoom,
+                ActualHeight / 2 + _gameCamera.Y * _zoom);
+        }
         DrawGrid(dc, center);
 
         if (_scene is null) return;
@@ -135,7 +149,7 @@ public sealed class Scene2DView : FrameworkElement
         foreach (var item in _scene.Objects)
         {
             if (!item.Visible) continue;
-            if (item.Type is "Camera2D" or "Camera3D" or "DirectionalLight" or "GlobalVolume") continue;
+            if (item.Type is "Camera3D" or "DirectionalLight" or "GlobalVolume") continue;
 
             if (item.IsVolume)
             {
@@ -144,10 +158,33 @@ public sealed class Scene2DView : FrameworkElement
             }
 
             var position = new Point(center.X + item.X * _zoom, center.Y - item.Y * _zoom);
+            var selected = string.Equals(item.Id, _selectedId, StringComparison.OrdinalIgnoreCase);
+
+            if (item.Type == "Camera2D")
+            {
+                var cameraRect = new Rect(position.X - 22, position.Y - 16, 44, 32);
+                var cameraFill = new SolidColorBrush(ParseColor(item.Color));
+                cameraFill.Freeze();
+                dc.DrawRoundedRectangle(cameraFill, selected ? SelectedPen : ObjectBorderPen, cameraRect, 6, 6);
+                dc.DrawEllipse(HandleBrush, null, position, 6, 6);
+
+                var cameraLabel = new FormattedText(
+                    item.Name,
+                    CultureInfo.CurrentUICulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface("Segoe UI"),
+                    10,
+                    LabelBrush,
+                    VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                dc.DrawText(cameraLabel, new Point(cameraRect.Left, cameraRect.Top - cameraLabel.Height - 4));
+
+                if (selected) DrawGizmo(dc, position);
+                continue;
+            }
+
             var width = Math.Max(SizeValue(item, 0) * _zoom, 6);
             var height = Math.Max(SizeValue(item, 1) * _zoom, 6);
             var rect = new Rect(position.X - width / 2, position.Y - height / 2, width, height);
-            var selected = string.Equals(item.Id, _selectedId, StringComparison.OrdinalIgnoreCase);
 
             if (item.Type == "Sprite" && TryDrawSprite(dc, item, rect)) { }
             else
@@ -175,15 +212,6 @@ public sealed class Scene2DView : FrameworkElement
             dc.DrawText(label, new Point(rect.Left, rect.Top - label.Height - 4));
 
             if (selected) DrawGizmo(dc, position);
-        }
-
-        if (_scene.Objects.Any(item => item.Type is "Camera2D" or "Camera3D"))
-        {
-            var hint = new FormattedText("Câmera do jogo",
-                CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-                new Typeface("Segoe UI"), 10, DimLabelBrush,
-                VisualTreeHelper.GetDpi(this).PixelsPerDip);
-            dc.DrawText(hint, new Point(14, ActualHeight - 28));
         }
     }
 

@@ -112,6 +112,18 @@ public sealed class ComponentData
     public string Color { get; set; } = "#FFFFFF";
     public bool Enabled { get; set; } = true;
 
+    public string Shape { get; set; } = "Box";
+    public bool Trigger { get; set; }
+    public double Mass { get; set; } = 1;
+    public double Gravity { get; set; } = 9.8;
+    public bool UseGravity { get; set; } = true;
+    public double Fov { get; set; } = 55;
+    public double NearPlane { get; set; } = 0.2;
+    public double FarPlane { get; set; } = 1200;
+    public string LayerMask { get; set; } = "*";
+    public double Volume { get; set; } = 1;
+    public bool Loop { get; set; } = true;
+
     public ComponentData Clone() => new()
     {
         Type = Type,
@@ -122,16 +134,34 @@ public sealed class ComponentData
         Amount = Amount,
         Range = Range,
         Color = Color,
-        Enabled = Enabled
+        Enabled = Enabled,
+        Shape = Shape,
+        Trigger = Trigger,
+        Mass = Mass,
+        Gravity = Gravity,
+        UseGravity = UseGravity,
+        Fov = Fov,
+        NearPlane = NearPlane,
+        FarPlane = FarPlane,
+        LayerMask = LayerMask,
+        Volume = Volume,
+        Loop = Loop
     };
 
     public string DisplayName => Type switch
     {
         "Script" => "Script",
+        "GlobalScript" => "Script global",
         "Rotator" => "Rotador",
         "SpriteAnimator" => "Animador de sprite",
         "PointLight" => "Luz pontual",
         "BoxVolume" => "Box Volume",
+        "Camera" => "Câmera",
+        "MeshRenderer" => "Mesh Renderer",
+        "BoxCollider" => "Collider de caixa",
+        "SphereCollider" => "Collider de esfera",
+        "Rigidbody" => "Rigidbody",
+        "AudioSource" => "Audio Source",
         _ => Type
     };
 }
