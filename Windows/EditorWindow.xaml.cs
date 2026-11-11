@@ -11,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.CodeCompletion;
 using Microsoft.Win32;
 using VelvX.Engine.Core;
 using VelvX.Engine.Language;
@@ -58,6 +59,11 @@ public partial class EditorWindow : Window
     private TreeViewItem? _dragResource;
     private readonly HashSet<string> _expandedHierarchy = new(StringComparer.OrdinalIgnoreCase);
     private List<HierarchyNode> _hierarchyRoots = [];
+    private CompletionWindow? _scriptCompletion;
+    private readonly List<HistoryEntry> _undoHistory = [];
+    private readonly List<HistoryEntry> _redoHistory = [];
+    private const int MaxHistoryEntries = 100;
+    private bool _restoringHistory;
     private string _workspace = "scene";
 
     public EditorWindow()
@@ -76,6 +82,8 @@ public partial class EditorWindow : Window
         View2D.ObjectSelected += id => SelectObjectById(id);
         View3D.TransformChanged += OnTransformChanged;
         View2D.TransformChanged += OnTransformChanged;
+        View3D.TransformStarted += () => RecordHistory("Transformar ator");
+        View2D.TransformStarted += () => RecordHistory("Transformar ator");
         View3D.GizmoModeChanged += _ => UpdateGizmoToolbar();
         View3D.RenderStatsChanged += (visible, total) =>
             ActorStatsText.Text = $"Atores visíveis agora: {visible} de {total}";
@@ -108,9 +116,74 @@ func InGame()
         ScriptEditor.Options.IndentationSize = 4;
         ScriptEditor.Options.EnableHyperlinks = false;
         ScriptEditor.Options.HighlightCurrentLine = true;
+        ScriptEditor.Options.ShowSpaces = false;
+        ScriptEditor.TextArea.IndentationStrategy = new VelvXIndentationStrategy();
         ScriptEditor.LineNumbersForeground = new SolidColorBrush(Color.FromRgb(79, 84, 100));
         ScriptEditor.TextChanged += (_, _) => OnScriptChanged();
         ScriptEditor.TextArea.Caret.PositionChanged += (_, _) => UpdateCaretStatus();
+        ScriptEditor.TextArea.TextEntered += OnScriptTextEntered;
+        ScriptEditor.TextArea.PreviewKeyDown += OnScriptPreviewKeyDown;
+    }
+
+    private void OnScriptPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Space && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            ShowScriptCompletion();
+            e.Handled = true;
+        }
+    }
+
+    private void OnScriptTextEntered(object sender, TextCompositionEventArgs e)
+    {
+        if (_isPlaying || ScriptEditor.IsReadOnly) return;
+
+        if (e.Text == ".")
+        {
+            ShowScriptCompletion();
+            return;
+        }
+
+        if (_scriptCompletion is null) return;
+        if (e.Text.Length == 1 && (char.IsLetterOrDigit(e.Text[0]) || e.Text[0] == '_'))
+            _scriptCompletion.CompletionList.SelectItem(ScriptWordBeforeCaret());
+        else
+            _scriptCompletion.CompletionList.RequestInsertion(e);
+    }
+
+    private string ScriptWordBeforeCaret()
+    {
+        var offset = ScriptEditor.CaretOffset;
+        var document = ScriptEditor.Document;
+        var start = offset;
+        while (start > 0)
+        {
+            var character = document.GetCharAt(start - 1);
+            if (!char.IsLetterOrDigit(character) && character != '_' && character != '.') break;
+            start--;
+        }
+        return document.GetText(start, offset - start);
+    }
+
+    private void ShowScriptCompletion()
+    {
+        if (_isPlaying || ScriptEditor.IsReadOnly || _scriptCompletion is not null) return;
+        var word = ScriptWordBeforeCaret();
+        _scriptCompletion = new CompletionWindow(ScriptEditor.TextArea)
+        {
+            StartOffset = ScriptEditor.CaretOffset - word.Length,
+            EndOffset = ScriptEditor.CaretOffset,
+            CloseWhenCaretAtBeginning = true,
+            Width = 360
+        };
+        _scriptCompletion.CompletionList.IsFiltering = true;
+        foreach (var item in VelvXCompletion.Items)
+            _scriptCompletion.CompletionList.CompletionData.Add(item);
+        _scriptCompletion.Closed += (_, _) => _scriptCompletion = null;
+        _scriptCompletion.Show();
+        if (word.Length > 0) _scriptCompletion.CompletionList.SelectItem(word);
+        if (_scriptCompletion.CompletionList.SelectedItem is { } selected)
+            _scriptCompletion.CompletionList.ScrollIntoView(selected);
     }
 
     // ── Projeto ──────────────────────────────────────────────────────────────
@@ -145,6 +218,8 @@ func InGame()
         _scenePath = project.ScenePath;
         var sceneExisted = File.Exists(_scenePath);
         _scene = LoadSceneDocument(_scenePath);
+        _undoHistory.Clear();
+        _redoHistory.Clear();
         _scene.Mode = is3D ? "3D" : "2D";
         if (!sceneExisted && _scene.Objects.Count == 0)
             SceneFactory.Populate(_scene, is3D, project.Info.EntryScript);
@@ -211,6 +286,8 @@ func InGame()
             _scenePath = Path.GetFullPath(path);
             var sceneExisted = File.Exists(_scenePath);
             _scene = LoadSceneDocument(_scenePath);
+            _undoHistory.Clear();
+            _redoHistory.Clear();
             _scene.Mode = _project.Info.Mode;
             if (!sceneExisted && _scene.Objects.Count == 0)
                 SceneFactory.Populate(_scene, _project.Is3D, _project.Info.EntryScript);
@@ -547,6 +624,123 @@ func InGame()
         if (node is not null) SelectObject(node.Object);
     }
 
+    private void RenameObject_Click(object sender, RoutedEventArgs e)
+    {
+        var node = HierarchyList.SelectedItem as HierarchyNode
+                   ?? FindHierarchyNode(_hierarchyRoots, _selected?.Id);
+        BeginRename(node);
+    }
+
+    private void HierarchyList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (_isPlaying || e.ChangedButton != MouseButton.Left) return;
+        var node = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.DataContext as HierarchyNode;
+        if (node is null) return;
+
+        e.Handled = true;
+        BeginRename(node);
+    }
+
+    /// <summary>Abre a edição inline do nome de um ator na hierarquia.</summary>
+    private void BeginRename(HierarchyNode? node)
+    {
+        if (node is null || _scene is null || _isPlaying) return;
+
+        SelectObject(node.Object);
+        node.EditName = node.Object.Name;
+        node.IsRenaming = true;
+
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            var box = FindRenameBox(HierarchyList, node);
+            if (box is null)
+            {
+                node.IsRenaming = false;
+                return;
+            }
+            box.Focus();
+            box.SelectAll();
+        }));
+    }
+
+    private void HierarchyRename_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox { DataContext: HierarchyNode node }) return;
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            CommitRename(node);
+            HierarchyList.Focus();
+        }
+        else if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            node.IsRenaming = false;
+            HierarchyList.Focus();
+        }
+    }
+
+    private void HierarchyRename_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: HierarchyNode node }) CommitRename(node);
+    }
+
+    /// <summary>Confirma o nome digitado, mantendo os nomes únicos na cena.</summary>
+    private void CommitRename(HierarchyNode node)
+    {
+        if (!node.IsRenaming) return;
+        node.IsRenaming = false;
+
+        if (_scene is null || _isPlaying) return;
+        var desired = node.EditName.Trim();
+        if (string.IsNullOrWhiteSpace(desired) ||
+            string.Equals(desired, node.Object.Name, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var name = UniqueActorName(node.Object.Id, desired);
+        if (!string.Equals(name, desired, StringComparison.Ordinal))
+        {
+            AddConsole($"Já existe um ator chamado '{desired}'. O nome '{name}' foi usado.", ScriptLogLevel.Warning);
+        }
+
+        RecordHistory("Renomear ator");
+        node.Object.Name = name;
+        SetDirty(true);
+        RefreshHierarchy(node.Object.Id);
+        UpdateInspector();
+        AddConsole($"Ator renomeado para '{name}'.", ScriptLogLevel.Info);
+    }
+
+    private string UniqueActorName(string id, string desired)
+    {
+        if (_scene is null) return desired;
+        var name = desired;
+        var suffix = 2;
+        while (_scene.Objects.Any(item =>
+                   !string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            name = $"{desired} {suffix++}";
+        }
+        return name;
+    }
+
+    private static TextBox? FindRenameBox(DependencyObject root, HierarchyNode node)
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var index = 0; index < count; index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is TextBox { Tag: "rename" } box && ReferenceEquals(box.DataContext, node))
+                return box;
+            var found = FindRenameBox(child, node);
+            if (found is not null) return found;
+        }
+        return null;
+    }
+
     private void MakeRoot_Click(object sender, RoutedEventArgs e)
     {
         if (_selected is null || _scene is null || _isPlaying) return;
@@ -662,6 +856,7 @@ func InGame()
                 ParticleSpeedField.Text = FormatNumber(particle.Speed);
                 ParticleSizeField.Text = FormatNumber(particle.ParticleSize);
                 ParticleColorField.Text = particle.Color;
+                ParticleColorSwatch.Background = new SolidColorBrush(ParseColor(particle.Color));
                 ParticleGravityCheck.IsChecked = particle.UseGravity;
             }
 
@@ -753,12 +948,35 @@ func InGame()
         }
     }
 
+    private void ColorSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_selected is null || _isPlaying) return;
+        var picked = ColorPickerWindow.Pick(this, ColorField.Text, "Cor do ator");
+        if (picked is null) return;
+
+        ColorField.Text = picked;
+        ColorSwatch.Background = new SolidColorBrush(ParseColor(picked));
+        ApplyInspector();
+    }
+
+    private void ParticleColorSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_selected is null || _isPlaying) return;
+        var picked = ColorPickerWindow.Pick(this, ParticleColorField.Text, "Cor das partículas");
+        if (picked is null) return;
+
+        ParticleColorField.Text = picked;
+        ParticleColorSwatch.Background = new SolidColorBrush(ParseColor(picked));
+        ApplyInspector();
+    }
+
     private static bool NearlyEqual(double left, double right) => Math.Abs(left - right) < 0.000001;
 
     private void ApplyInspector()
     {
         if (_updatingInspector || _selected is null || _scene is null || _isPlaying) return;
         var item = _selected;
+        var beforeEdit = _scene.Clone();
 
         var name = NameField.Text.Trim();
         if (string.IsNullOrWhiteSpace(name)) name = item.Name;
@@ -958,6 +1176,8 @@ func InGame()
 
         if (!changed && !visibilityChanged) return;
 
+        CommitHistory(beforeEdit, "Editar no inspetor");
+
         item.Name = name;
         item.Position = [x, y, z];
         item.Rotation = [rotX, rotY, rotZ];
@@ -1023,6 +1243,7 @@ func InGame()
         var window = new MaterialWindow(_project, _selected.Material) { Owner = this };
         if (window.ShowDialog() != true) return;
 
+        RecordHistory("Aplicar material");
         _selected.Material = window.SelectedMaterialPath;
         MaterialField.Text = _selected.Material ?? "";
         LoadSceneIntoViews();
@@ -1034,6 +1255,7 @@ func InGame()
     private void ClearMaterial_Click(object sender, RoutedEventArgs e)
     {
         if (_selected is null || _isPlaying) return;
+        RecordHistory("Remover material");
         _selected.Material = null;
         MaterialField.Text = "";
         LoadSceneIntoViews();
@@ -1540,7 +1762,40 @@ func InGame()
                 apply(box.Text.Trim());
                 args.Handled = true;
             };
-            panel.Children.Add(box);
+
+            if (field.Label.Contains("COR", StringComparison.OrdinalIgnoreCase) &&
+                IsValidColor(field.Value ?? ""))
+            {
+                var chip = new Border
+                {
+                    Width = 24,
+                    Height = 24,
+                    Margin = new Thickness(4, 0, 0, 0),
+                    CornerRadius = new CornerRadius(5),
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(58, 62, 76)),
+                    BorderThickness = new Thickness(1),
+                    Background = new SolidColorBrush(ParseColor(box.Text)),
+                    Cursor = Cursors.Hand,
+                    ToolTip = "Abrir seletor de cores"
+                };
+                DockPanel.SetDock(chip, Dock.Right);
+                chip.MouseLeftButtonDown += (_, _) =>
+                {
+                    var picked = ColorPickerWindow.Pick(this, box.Text, field.Label);
+                    if (picked is null) return;
+                    box.Text = picked;
+                    chip.Background = new SolidColorBrush(ParseColor(picked));
+                    apply(picked);
+                };
+                var row = new DockPanel();
+                row.Children.Add(chip);
+                row.Children.Add(box);
+                panel.Children.Add(row);
+            }
+            else
+            {
+                panel.Children.Add(box);
+            }
             grid.Children.Add(panel);
         }
         parent.Children.Add(grid);
@@ -1645,6 +1900,9 @@ func InGame()
 
             case "edit":
                 AddMenuTitle(MenuPopupPanel, "EDITAR");
+                AddMenuButton(MenuPopupPanel, "Desfazer                      Ctrl+Z", Undo);
+                AddMenuButton(MenuPopupPanel, "Refazer                       Ctrl+Y", Redo);
+                AddMenuSeparator(MenuPopupPanel);
                 AddMenuButton(MenuPopupPanel, "Duplicar objeto             Ctrl+D", DuplicateSelected);
                 AddMenuButton(MenuPopupPanel, "Criar prefab do objeto", () => CreatePrefabFromSelected(null));
                 AddMenuButton(MenuPopupPanel, "Focar na câmera                    F", () => FocusSelected_Click(this, new RoutedEventArgs()));
@@ -1965,6 +2223,69 @@ func InGame()
         var name = _project?.Info.Name ?? "VelvX";
         Title = $"{name} — VelvX Engine{(dirty ? " •" : "")}";
     }
+
+    // ── Desfazer / refazer ──────────────────────────────────────────────────
+
+    /// <summary>Registra o estado da cena antes de uma alteração. Use antes de mutar.</summary>
+    private void RecordHistory(string label)
+    {
+        if (_scene is null || _isPlaying || _restoringHistory) return;
+        CommitHistory(_scene.Clone(), label);
+    }
+
+    private void CommitHistory(SceneDocument before, string label)
+    {
+        if (_isPlaying || _restoringHistory) return;
+
+        _undoHistory.Add(new HistoryEntry(before, _selected?.Id, label));
+        if (_undoHistory.Count > MaxHistoryEntries)
+            _undoHistory.RemoveAt(0);
+        _redoHistory.Clear();
+    }
+
+    private void Undo()
+    {
+        if (_isPlaying || _scene is null || _undoHistory.Count == 0) return;
+        if (_restoringHistory) return;
+
+        var target = _undoHistory[^1];
+        _undoHistory.RemoveAt(_undoHistory.Count - 1);
+        _redoHistory.Add(new HistoryEntry(_scene.Clone(), _selected?.Id, target.Label));
+        RestoreHistory(target, "Desfeito");
+    }
+
+    private void Redo()
+    {
+        if (_isPlaying || _scene is null || _redoHistory.Count == 0) return;
+        if (_restoringHistory) return;
+
+        var target = _redoHistory[^1];
+        _redoHistory.RemoveAt(_redoHistory.Count - 1);
+        _undoHistory.Add(new HistoryEntry(_scene.Clone(), _selected?.Id, target.Label));
+        RestoreHistory(target, "Refeito");
+    }
+
+    private void RestoreHistory(HistoryEntry entry, string action)
+    {
+        _restoringHistory = true;
+        try
+        {
+            _scene = entry.Scene.Clone();
+            _selected = null;
+            RefreshHierarchy(entry.SelectedId);
+            SelectObject(string.IsNullOrWhiteSpace(entry.SelectedId) ? null : _scene.Find(entry.SelectedId));
+            LoadSceneIntoViews();
+            SetDirty(true);
+        }
+        finally
+        {
+            _restoringHistory = false;
+        }
+
+        AddConsole($"{action}: {entry.Label}.", ScriptLogLevel.Info);
+    }
+
+    private sealed record HistoryEntry(SceneDocument Scene, string? SelectedId, string Label);
 
     private bool SaveProject(bool notify = true)
     {
@@ -2426,6 +2747,7 @@ func InGame()
         AddObjectPopup.IsOpen = false;
         if (_scene is null || _isPlaying) return;
 
+        RecordHistory("Adicionar partículas");
         var item = _scene.CreateObject("GameObject");
         item.Name = _scene.NewName("GameObject", "Partículas");
         item.Components.Add(new ComponentData
@@ -2451,6 +2773,7 @@ func InGame()
         AddObjectPopup.IsOpen = false;
         if (_scene is null || _isPlaying) return;
 
+        RecordHistory($"Adicionar {type}");
         var item = _scene.CreateObject(type);
         if (item.Type is "CharacterBody3D" or "CharacterBody2D")
             item.Script = _project?.Info.EntryScript;
@@ -2467,6 +2790,7 @@ func InGame()
     private void DuplicateSelected()
     {
         if (_selected is null || _scene is null || _isPlaying) return;
+        RecordHistory($"Duplicar '{_selected.Name}'");
         var clone = _scene.AddClone(_selected);
         clone.Position = [clone.X + 1, clone.Y, clone.Z];
         LoadSceneIntoViews();
@@ -2483,6 +2807,7 @@ func InGame()
         if (_selected is null || _scene is null || _isPlaying) return;
 
         var name = _selected.Name;
+        RecordHistory($"Excluir '{name}'");
         _scene.Remove(_selected);
         _selected = null;
         LoadSceneIntoViews();
@@ -2502,6 +2827,8 @@ func InGame()
                 "Câmera do jogo", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
+
+        RecordHistory("Definir câmera do jogo");
 
         foreach (var other in _scene.Objects)
         {
@@ -2790,6 +3117,7 @@ func InGame()
         try
         {
             var prefab = PrefabDocument.Load(path);
+            RecordHistory($"Instanciar prefab '{prefab.Name}'");
             var clone = _scene.AddClone(prefab.Object, prefab.Name);
             clone.Position = [clone.X + 1, clone.Y, clone.Z];
             LoadSceneIntoViews();
@@ -3201,6 +3529,9 @@ func InGame()
                 return;
             }
 
+            RecordHistory(target is null
+                ? $"Mover '{dragged.Name}' para a raiz"
+                : $"Mover '{dragged.Name}' para '{target.Name}'");
             dragged.ParentId = target?.Id;
             if (target is not null) _expandedHierarchy.Add(target.Id);
             SetDirty(true);
@@ -3312,6 +3643,7 @@ func InGame()
 
         var relative = EnsureAsset(source, "Models");
         var name = Path.GetFileNameWithoutExtension(source);
+        RecordHistory($"Importar modelo '{name}'");
         var item = _scene.CreateObject("Model3D");
         item.Name = _scene.NewName("Model3D", name);
         item.Model = relative;
@@ -3368,6 +3700,7 @@ func InGame()
 
         var relative = EnsureAsset(source, "Sprites");
         var name = Path.GetFileNameWithoutExtension(source);
+        RecordHistory($"Importar sprite '{name}'");
         var item = _scene.CreateObject("Sprite");
         item.Name = _scene.NewName("Sprite", name);
         item.Sprite = new SpriteSettings
@@ -3523,6 +3856,19 @@ func InGame()
         }
 
         var control = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+        if (control && (e.Key == Key.Z || e.Key == Key.Y) && !IsTextInputFocused())
+        {
+            if (e.Key == Key.Z && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) Undo();
+            else Redo();
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.F2 && !IsTextInputFocused() && _workspace == "scene" && _selected is not null)
+        {
+            BeginRename(FindHierarchyNode(_hierarchyRoots, _selected.Id));
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.F5)
         {
             StartPlay();
@@ -3681,6 +4027,8 @@ public sealed class HierarchyNode : INotifyPropertyChanged
 {
     private bool _isExpanded;
     private bool _isSelected;
+    private bool _isRenaming;
+    private string _editName = "";
 
     public HierarchyNode(SceneObject item) => Object = item;
 
@@ -3706,6 +4054,29 @@ public sealed class HierarchyNode : INotifyPropertyChanged
             if (_isSelected == value) return;
             _isSelected = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        }
+    }
+
+    public bool IsRenaming
+    {
+        get => _isRenaming;
+        set
+        {
+            if (_isRenaming == value) return;
+            _isRenaming = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRenaming)));
+        }
+    }
+
+    /// <summary>Nome em edição enquanto o ator é renomeado na hierarquia.</summary>
+    public string EditName
+    {
+        get => _editName;
+        set
+        {
+            if (_editName == value) return;
+            _editName = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EditName)));
         }
     }
 

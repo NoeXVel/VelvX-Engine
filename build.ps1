@@ -11,7 +11,7 @@ $dist = Join-Path $root "dist"
 $output = Join-Path $dist "VelvX-Engine-$Runtime"
 $zip = "$output.zip"
 
-$version = "0.4.0"
+$version = "0.4.5"
 $match = [regex]::Match((Get-Content $project -Raw), "<Version>([^<]+)</Version>")
 if ($match.Success) { $version = $match.Groups[1].Value }
 
@@ -62,15 +62,17 @@ VelvX Engine $version - Bigorna
 2. Execute VelvX.Engine.exe.
 3. Crie um projeto em Novo projeto: 3D, 2D, Vazio 3D ou Vazio 2D.
 
-Novidades da 0.4.0 (Fix):
-  - gizmos de mover, girar e escalar com atalhos 1, 2 e 3;
-  - movimento livre no viewport 3D e hierarquia que segue o pai;
-  - escala de modelos corrigida, com ou sem rig;
-  - inspetor redesenhado e atores com LOD e distancia de renderizacao;
-  - primitivas 3D, MeshCollider automatico e StaticBody com colisao;
-  - materiais reutilizaveis com textura, emissao, brilho e opacidade;
-  - efeitos visuais pulsantes nos Box Volumes e luz pontual aprimorada;
-  - documentacao completa da VelvX Language dentro do editor.
+Novidades da 0.4.5 (Fix - issue #3):
+  - janela de documentacao corrigida (sem travar ao abrir topicos);
+  - autocomplete e auto-indentacao de volta no editor de scripts;
+  - variaveis globais persistentes com a palavra-chave global;
+  - filhos acompanham o pai na hierarquia tambem no Play;
+  - Desfazer/Refazer com Ctrl+Z e Ctrl+Y;
+  - textura de modelos importados respeita o UV mapping original;
+  - renomear atores na hierarquia com F2, duplo clique ou menu;
+  - seletor de cores com roda HSV, brilho, hexadecimal e paleta;
+  - templates 3D e 2D com duas fases, portais, particulas e troca de cena;
+  - explicacao de troca de fase na documentacao e nos templates.
 
 Teclas no editor:
   F5 ........ iniciar o jogo
@@ -78,6 +80,9 @@ Teclas no editor:
   Ctrl+S .... salvar o projeto
   Ctrl+, .... abrir Configuracoes do Projeto
   F ......... focar o ator selecionado
+  F2 ........ renomear o ator selecionado
+  Ctrl+Z .... desfazer
+  Ctrl+Y .... refazer
   WASD ...... mover a camera 3D no editor
   1 / 2 / 3 . alternar gizmo de mover, girar e escalar
   Setas ..... mover o Player durante o Play

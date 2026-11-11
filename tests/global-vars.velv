@@ -1,0 +1,19 @@
+## Verifica variáveis globais persistentes na VelvX Language
+global partidas : Int = 0;
+global total = 0.0;
+
+var local = 0;
+
+func Main()
+{
+    partidas = partidas + 1;
+    total = 0;
+    console.show("Main: partidas={partidas} total={total}");
+}
+
+func InGame()
+{
+    local = local + 1;
+    total = total + 1;
+    console.show("Frame: partidas={partidas} total={total} local={local}");
+}

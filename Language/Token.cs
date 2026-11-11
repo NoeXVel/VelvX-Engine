@@ -8,6 +8,7 @@ public enum TokenType
     String,
 
     Var,
+    Global,
     Func,
     If,
     Else,

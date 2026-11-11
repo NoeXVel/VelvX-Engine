@@ -1,24 +1,62 @@
-## Ponto de entrada do jogo 2D.
+## Jogo de exemplo 2D com duas fases ligadas por portais.
+##
 ## Main() roda uma vez, quando o Play começa.
-## InGame() roda a cada quadro — ideal para inputs e movimento.
+## InGame() roda a cada quadro — use para inputs, movimento e troca de fase.
+##
+## Troca de cena:
+##   Scene("Floresta").load()        carrega a cena em memória.
+##   Scene("Floresta").set_active()  torna a cena ativa; o "this" passa a ser
+##                                   o Player2D da Floresta automaticamente.
+##   Cada cena tem o seu próprio Player2D, por isso basta reposicionar o "this"
+##   logo depois da troca para definir o ponto de entrada da fase.
+##
+## Quer uma terceira fase? Crie outro .scene.json com um Player2D e repita o
+## mesmo padrão: load(), set_active() e this.position.
+
+global fase : Int = 1;
+global espera = 0.0;
 
 func Main()
 {
-    console.show("VelvX 2D pronta. Use WASD ou as setas para mover o Player2D.");
-    console.show("Pressione E para carregar a Floresta por streaming.");
+    console.show("Fase 1 — Clareira.");
+    console.show("WASD/setas movem. Pressione E no portal roxo à direita.");
 }
 
 func InGame()
 {
     ## Ordem dos argumentos: positivo X, negativo X, positivo Y, negativo Y.
-    ## Os nomes abaixo são ações do projeto — edite em Projeto > Configurações > Entradas.
     var direcao = game.get_input_vectors("mover_direita", "mover_esquerda", "mover_cima", "mover_baixo");
     this.CharacterBody2D.velocity = new.Vector2(direcao.x * 5, direcao.y * 5);
 
-    ## Streaming de nível: carrega a Floresta uma única vez.
-    if game.get_input("interagir") and not Scene("Floresta").is_loaded()
+    ## Evita repetir a troca enquanto E continua pressionado.
+    espera = espera - game.delta_time;
+
+    if Scenes.current == "Main"
     {
-        Scene("Floresta").load();
-        console.show("Floresta carregada por streaming.");
+        if espera <= 0 and this.position.x > 6.5 and game.get_input("interagir")
+        {
+            if not Scene("Floresta").is_loaded()
+            {
+                Scene("Floresta").load();
+                console.show("Floresta carregada por streaming.");
+            }
+
+            Scene("Floresta").set_active();
+            this.position = new.Vector2(8.5, -3.4);
+            fase = 2;
+            espera = 1.2;
+            console.show("Fase 2 — Floresta. Volte pelo portal laranja à esquerda.");
+        }
+    }
+    else
+    {
+        if espera <= 0 and this.position.x < -9.2 and game.get_input("interagir")
+        {
+            Scene("Main").set_active();
+            this.position = new.Vector2(-6, -3.4);
+            fase = 1;
+            espera = 1.2;
+            console.show("Fase 1 — Clareira.");
+        }
     }
 }

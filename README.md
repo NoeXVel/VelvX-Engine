@@ -4,7 +4,7 @@
 
 ![Launcher da VelvX Engine](docs/images/launcher.png)
 
-> **Versão 0.4.0 — Bigorna (Fix).** A build que fecha o ciclo de correções: escala de modelos corrigida (com ou sem rig), gizmos de mover, girar e escalar com atalhos `1/2/3`, movimento livre no viewport, hierarquia que segue o pai, inspetor redesenhado, **Atores** com LOD e distância de renderização, primitivas 3D, **MeshCollider** automático, colisão entre **CharacterBody** e **StaticBody**, efeitos visuais nos Box Volumes, iluminação em três pontos e **materiais reutilizáveis**. A VelvX Language ganhou documentação profissional dentro do editor.
+> **Versão 0.4.5 — Bigorna (Fix).** A build que resolve a [issue #3](https://github.com/NoeXVel/VelvX-Engine/issues/3): a documentação da linguagem abre sem travar, o **autocomplete** e o **auto-indent** voltaram a funcionar, **variáveis globais** (`global`) mantêm o valor entre quadros e cenas, os filhos **seguem o pai durante o Play**, **Ctrl+Z/Ctrl+Y** desfazem e refazem, a textura do material respeita o **mapeamento UV** do modelo, atores podem ser **renomeados na hierarquia** (`F2` ou duplo clique), a cor tem **seletor com roda de cores** e os templates Starter 3D/2D agora são **jogos de duas fases** com portais, partículas, iluminação e troca de cena documentada.
 
 ## O que já funciona
 
@@ -13,14 +13,16 @@
 - **Launcher** com projetos recentes, catálogo de templates (Starter e Vazio) e abertura de projetos.
 - **Novo projeto** 3D ou 2D com nome, pasta de destino e cópia do template. Os templates **Vazio 3D** e **Vazio 2D** começam apenas com a câmera e o script de entrada.
 - **Atores**: cada item da cena é um ator com transformação, nome, camada, pai e componentes. O tipo **Ator vazio** serve de contêiner e marcador.
-- **Hierarquia** com busca, seletor de cena, indicador de cenas carregadas e criação de atores/cenas. O pai pode ser escolhido no inspetor, sem ciclos, e os filhos acompanham posição, rotação e escala do pai.
+- **Hierarquia** com busca, seletor de cena, indicador de cenas carregadas e criação de atores/cenas. O pai pode ser escolhido no inspetor, sem ciclos, e os filhos acompanham posição, rotação e escala do pai **também durante o Play**. Renomeie um ator com `F2`, duplo clique ou pelo menu de contexto; nomes repetidos recebem um sufixo e um aviso no console.
 - **Inspetor** redesenhado: nome, posição, rotação, escala, cor, visibilidade, tag, **camada**, **pai**, modelo (com **escala, textura e material**), sprite, luz, volume, câmera, **componentes** e painel de **Ator** com LOD e distância de renderização.
+- **Seletor de cores**: clique na amostra de cor do ator, da partícula, do material ou de um campo `COR` para abrir a roda de cores com brilho, campo hexadecimal e paleta rápida.
+- **Desfazer e refazer** com `Ctrl+Z` e `Ctrl+Y` (ou `Ctrl+Shift+Z`): mover, girar, escalar, renomear, criar, duplicar e remover atores.
 - **Gizmos 3D de mover, girar e escalar** (`1`, `2`, `3`): arraste os eixos coloridos ou o centro para mover livremente no plano da câmera. `Ctrl` encaixa em 0,25 (mover), 15° (girar) ou 0,25 (escalar); `Shift` refina o encaixe.
 - **Seleção pelo viewport**: clique no ator no 3D para selecioná-lo.
 - **Câmera 3D de editor** com WASD/setas, `E`/`Q` para subir/descer, `Shift` para acelerar, botão direito para orbitar, botão do meio para mover e scroll para zoom. O movimento é contínuo, sem saltos de grade.
-- **Materiais**: crie materiais em `Assets/Materials` com cor, emissão, textura, suavidade, opacidade e repetição, e aplique em qualquer modelo pelo inspetor.
+- **Materiais**: crie materiais em `Assets/Materials` com cor, emissão, textura, suavidade, opacidade e repetição, e aplique em qualquer modelo pelo inspetor. A textura usa o **mapeamento UV** gravado no modelo, sem distorcer a imagem, e o editor de materiais tem seletor de cores para albedo e emissão.
 - **Janela grande de script** com autocomplete (`Ctrl+Espaço`), auto-indent, realce da VelvX, lista dos scripts do projeto, abrir/salvar/salvar como e status Ln/Col.
-- **Documentação da VelvX Language** dentro do editor: variáveis, comentários, funções, laços, vetores, APIs, componentes e exemplos completos, também disponível em `docs/VelvX-Language.md`.
+- **Documentação da VelvX Language** dentro do editor: variáveis, comentários, funções, laços, vetores, APIs, componentes e exemplos completos, também disponível em `docs/VelvX-Language.md`. A janela abre e navega por todos os tópicos sem travar.
 - **Painel de Recursos** ao lado da Saída: cenas, scripts, materiais e pastas `Assets/Audio`, `Assets/Models`, `Assets/Sprites`, `Assets/Textures` e `Prefabs`, com ícones por tipo e arrastar-soltar.
 - **Prefabs**: arraste um objeto da hierarquia para `Prefabs` (ou use o menu de contexto) e arraste o prefab de volta para a cena.
 - **Modo Play** com `F5`, `Esc` para parar, FPS ao vivo, restauração automática da cena e console de saída. A **câmera principal** do jogo é definida no inspetor.
@@ -47,10 +49,10 @@
 - **Configurações do Projeto** (`Ctrl+,`): nome, modo, **Inputs personalizados**, renderização/FPS, iluminação e volumes, cenas e streaming.
 - **Camadas e scripts** (`Ctrl+,` → Camadas e scripts): camadas, matriz de colisão (pares `A|B` que não colidem) e lista de **scripts globais**.
 - **Inputs próprios**: crie ações com qualquer nome e teclas separadas por vírgula; use `game.get_input("minha_acao")` e `game.get_input_vectors(...)`.
-- **Múltiplas cenas**: carregue, descarregue e troque a cena ativa em tempo real com `Scene("Nome").load()`, `unload()`, `set_active()` e `is_loaded()`.
+- **Múltiplas cenas**: carregue, descarregue e troque a cena ativa em tempo real com `Scene("Nome").load()`, `unload()`, `set_active()` e `is_loaded()`. Ao ativar outra cena, `this` passa a apontar para o jogador dela e os scripts de componentes da cena carregada começam a rodar. Os templates Starter usam isso para criar **duas fases** com portais de ida e volta.
 - **Hierarquia em scripts**: `get_parent()`, `get_children()`, `find_child("Nome")` e `is_child_of(outro)`.
 - **Limite de FPS** configurável (padrão 60) e opção de esconder o contador.
-- **VelvX Language** com variáveis, funções, `if`, `while`, vetores, strings interpoladas, acesso à cena, componentes e ciclo `Main()`/`InGame()`.
+- **VelvX Language** com variáveis locais (`var`), **variáveis globais** (`global`) que mantêm o valor entre quadros e cenas, funções, `if`, `while`, vetores, strings interpoladas, acesso à cena, componentes e ciclo `Main()`/`InGame()`.
 - **Build portátil** autossuficiente para `win-x64` (não exige .NET instalado).
 - **Executor headless** para testar scripts sem abrir o editor.
 
@@ -95,7 +97,7 @@ A pasta `dist/` fica fora do Git; publique o zip em **Releases** no GitHub — v
 2. No editor, selecione um objeto e mova-o com as **setas coloridas** ou edite os campos do inspetor.
 3. Navegue pela cena 3D com **WASD** (e **E/Q** para subir/descer) ou orbite com o botão direito.
 4. Edite `Scripts/Main.velv` no painel de script e clique em **Salvar**.
-5. Pressione **F5** e mova o Player com **WASD** ou as **setas**. No template 3D, pressione **E** para carregar a **Arena** por streaming; no 2D, a **Floresta**.
+5. Pressione **F5** e mova o Player com **WASD** ou as **setas**. No template 3D, entre no portal ao fundo do salão para trocar para a **Arena**; no 2D, caminhe até o portal à direita para entrar na **Floresta**. No portal da outra cena, volte para a fase inicial.
 6. Pressione **Esc** para parar. A cena volta ao estado salvo.
 
 ### Controles do editor
@@ -113,7 +115,10 @@ A pasta `dist/` fica fora do Git; publique o zip em **Releases** no GitHub — v
 | Zoom | scroll do mouse |
 | Resetar a câmera | botão **Resetar** |
 | Selecionar objeto | clique no viewport ou na hierarquia |
-| Mover objeto | arrastar as setas X/Y/Z |
+| Alternar gizmo | `1` mover / `2` girar / `3` escalar |
+| Mover objeto | arrastar as setas X/Y/Z ou o centro do gizmo |
+| Renomear ator | `F2` ou duplo clique na hierarquia |
+| Desfazer / refazer | `Ctrl+Z` / `Ctrl+Y` (ou `Ctrl+Shift+Z`) |
 | Duplicar / remover | `Ctrl+D` / `Delete` |
 | Mover o jogador no Play | `WASD` ou setas |
 | Janela grande de script | botão **Ampliar** ou menu **Editor de script** |
@@ -142,25 +147,40 @@ func InGame()
 
 Os nomes padrão (`mover_direita`, `mover_esquerda`, `mover_cima`, `mover_baixo`, `pular`, `interagir`, `correr`) continuam funcionando mesmo que você crie os seus.
 
-## Streaming de cenas
+## Streaming e troca de fases
 
-Uma cena pode carregar outra sem sair do jogo. A cena ativa continua sendo atualizada; use `set_active()` para trocar a que recebe o jogador e os scripts.
+Uma cena pode carregar outra sem sair do jogo. A cena ativa continua sendo atualizada; use `set_active()` para trocar a que recebe o jogador e os scripts. Ao ativar uma cena, `this` passa a apontar para o jogador dela e os scripts dos componentes daquela cena começam a rodar.
 
 ```velv
-func Main()
-{
-    Scene("Arena").load();
-}
+global fase : Int = 1;
+global espera = 0.0;
 
 func InGame()
 {
-    if game.get_input("interagir") and not Scene("Arena").is_loaded()
+    espera = espera - game.delta_time;
+
+    # Entra na Arena ao tocar no portal.
+    if fase == 1 and this.position.z > 6 and espera < 0
     {
         Scene("Arena").load();
-        console.show("Arena carregada por streaming.");
+        Scene("Arena").set_active();
+        this.position = new.Vector3(0, 0.1, -9);
+        fase = 2;
+        espera = 1.2;
+    }
+
+    # Volta para o salão pelo portal da Arena.
+    if fase == 2 and this.position.z > 8.8 and espera < 0
+    {
+        Scene("Main").set_active();
+        this.position = new.Vector3(0, 0.1, 0);
+        fase = 1;
+        espera = 1.2;
     }
 }
 ```
+
+Cada cena tem seu próprio Player com script e tag `player`; o portal é um `BoxVolume` (3D) ou uma elipse (2D) com partículas e luz. Os templates **Starter 3D** e **Starter 2D** implementam essas duas fases completas — veja [Templates/README.md](Templates/README.md).
 
 Crie novas cenas pelo botão **+** ao lado do seletor de cena na hierarquia, ou adicione um arquivo `.scene.json` em `Scenes/`.
 
@@ -253,7 +273,7 @@ func InGame()
 }
 ```
 
-Comentários `#`, `//`, `/* */` e `#* *#`; variáveis `var vida : Int = 100;` ou `var vida := 100;`; funções; `if`/`else`; `while`; vetores `Vector2`/`Vector3`; `console.show/warn/error`; `this`; `Scene("...")`; `Assets.pathObject("...")`.
+Comentários `#`, `//`, `/* */` e `#* *#`; variáveis locais `var vida : Int = 100;` ou `var vida := 100;`; variáveis **globais** `global pontos : Int = 0;` que sobrevivem a cada quadro e à troca de cena; funções; `if`/`else`; `while`; vetores `Vector2`/`Vector3`; `console.show/warn/error`; `this`; `Scene("...")`; `Assets.pathObject("...")`.
 
 A referência completa está em [docs/VelvX-Language.md](docs/VelvX-Language.md).
 
@@ -304,7 +324,7 @@ Monte um projeto do zero, copie a pasta dele para `Templates/<nome>` e adicione 
   "name": "Meu template",
   "description": "Minha base de jogo personalizada.",
   "mode": "3D",
-  "version": "0.4.0"
+  "version": "0.4.5"
 }
 ```
 
@@ -323,6 +343,7 @@ Opções: `--frames N`, `--scene arquivo.scene.json`, `--mode 2D|3D`, `--out res
 - [VelvX Language](docs/VelvX-Language.md) — sintaxe, tipos, operadores, APIs e limites.
 - [Arquitetura](docs/ARQUITETURA.md) — como o launcher, o editor, o runtime e o build se conectam.
 - [Publicando no GitHub](docs/GITHUB.md) — primeiro envio, atualizações e releases.
+- [Notas da versão 0.4.5](docs/RELEASE-v0.4.5.md) — correções da issue #3: documentação, editor, `global`, hierarquia no Play, undo/redo, UV, renomear atores, seletor de cores e templates de duas fases.
 - [Notas da versão 0.4.0](docs/RELEASE-v0.4.0.md) — gizmos completos, escala de modelos, atores com LOD, materiais, MeshCollider, documentação da linguagem e correções de física e inspetor.
 - [Notas da versão 0.3.2](docs/RELEASE-v0.3.2.md) — correções da issue #2: layout, hierarquia, recursos, câmera, inputs, CharacterBody, partículas e iluminação.
 - [Notas da versão 0.3.0](docs/RELEASE-v0.3.0.md) — correções da issue #1, novidades e limitações da build Bigorna.
@@ -334,4 +355,4 @@ Sistema de UI, matriz de colisão visual, hierarquia aninhada, jogo de exemplo, 
 
 ---
 
-Feito por **Gean** · VelvX Engine 0.4.0 “Bigorna” · [github.com/NoeXVel/VelvX-Engine](https://github.com/NoeXVel/VelvX-Engine)
+Feito por **Gean** · VelvX Engine 0.4.5 “Bigorna” · [github.com/NoeXVel/VelvX-Engine](https://github.com/NoeXVel/VelvX-Engine)

@@ -147,6 +147,8 @@ public sealed class Scene3DView : Grid
 
     public event Action<string?>? ObjectSelected;
     public event Action<SceneObject>? TransformChanged;
+    public event Action? TransformStarted;
+    public event Action? TransformCompleted;
     public event Action<GizmoMode>? GizmoModeChanged;
     public event Action<int, int>? RenderStatsChanged;
 
@@ -1509,6 +1511,7 @@ public sealed class Scene3DView : Grid
         _dragStartDistance = Math.Max(1, (point - (Project(origin) ?? point)).Length);
         _dragUnitsPerPixel = ComputeUnitsPerPixel(item, axis);
         CaptureMouse();
+        TransformStarted?.Invoke();
         return true;
     }
 
@@ -1702,10 +1705,12 @@ public sealed class Scene3DView : Grid
 
     private void OnMouseUp(object sender, MouseButtonEventArgs e)
     {
+        var wasDraggingGizmo = _draggingGizmo;
         _orbiting = false;
         _panning = false;
         _draggingGizmo = false;
         ReleaseMouseCapture();
+        if (wasDraggingGizmo) TransformCompleted?.Invoke();
     }
 
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)

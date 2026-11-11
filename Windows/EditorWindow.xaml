@@ -28,8 +28,36 @@
         <TextBlock Text="{Binding Object.Glyph}" Foreground="#B7A4FF" FontSize="13"
                    VerticalAlignment="Center" />
         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-          <TextBlock Text="{Binding Object.Name}" FontSize="11.5" Foreground="#E3DFEF"
-                     TextTrimming="CharacterEllipsis" />
+          <Grid>
+            <TextBlock Text="{Binding Object.Name}" FontSize="11.5" Foreground="#E3DFEF"
+                       TextTrimming="CharacterEllipsis">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsRenaming}" Value="True">
+                      <Setter Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+            <TextBox Tag="rename" Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
+                     FontSize="11.5" Foreground="#F1EEFA" Background="#151720" CaretBrush="#C9B8FF"
+                     BorderBrush="{StaticResource Accent}" BorderThickness="1" Padding="2,0" MinHeight="18"
+                     VerticalContentAlignment="Center"
+                     KeyDown="HierarchyRename_KeyDown" LostFocus="HierarchyRename_LostFocus">
+              <TextBox.Style>
+                <Style TargetType="TextBox">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsRenaming}" Value="True">
+                      <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBox.Style>
+            </TextBox>
+          </Grid>
           <TextBlock Text="{Binding Object.Type}" FontSize="8.5" Foreground="#707585"
                      Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
         </StackPanel>
@@ -57,7 +85,7 @@
           <Button x:Name="MenuViewButton" Content="Janela" Tag="view" Style="{StaticResource GhostButton}" FontSize="12" Padding="11,4" Click="Menu_Click" />
           <Button x:Name="MenuHelpButton" Content="Ajuda" Tag="help" Style="{StaticResource GhostButton}" FontSize="12" Padding="11,4" Click="Menu_Click" />
         </StackPanel>
-        <TextBlock x:Name="EngineVersionText" DockPanel.Dock="Right" Text="VelvX Engine 0.4.0 · Bigorna" FontSize="9.5" Foreground="#5E6372" VerticalAlignment="Center" />
+        <TextBlock x:Name="EngineVersionText" DockPanel.Dock="Right" Text="VelvX Engine 0.4.5 · Bigorna" FontSize="9.5" Foreground="#5E6372" VerticalAlignment="Center" />
       </DockPanel>
     </Border>
 
@@ -154,7 +182,8 @@
                       AllowDrop="True" Drop="HierarchyList_Drop"
                       PreviewMouseLeftButtonDown="HierarchyList_PreviewMouseLeftButtonDown"
                       PreviewMouseRightButtonDown="HierarchyList_PreviewMouseRightButtonDown"
-                      PreviewMouseMove="HierarchyList_PreviewMouseMove">
+                      PreviewMouseMove="HierarchyList_PreviewMouseMove"
+                      MouseDoubleClick="HierarchyList_MouseDoubleClick">
               <TreeView.ItemContainerStyle>
                 <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
                   <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
@@ -165,6 +194,8 @@
               </TreeView.ItemContainerStyle>
               <TreeView.ContextMenu>
                 <ContextMenu>
+                  <MenuItem Header="Renomear ator (F2)" Click="RenameObject_Click" />
+                  <Separator />
                   <MenuItem Header="Duplicar ator" Click="DuplicateObject_Click" />
                   <MenuItem Header="Criar prefab a partir do ator" Click="CreatePrefabFromObject_Click" />
                   <MenuItem Header="Definir como câmera do jogo" Click="SetAsGameCamera_Click" />
@@ -523,7 +554,8 @@
               <DockPanel Margin="0,0,0,10">
                 <StackPanel DockPanel.Dock="Left" Width="96">
                   <TextBlock Text="COR" Style="{StaticResource FieldLabel}" />
-                  <Border x:Name="ColorSwatch" Width="34" Height="28" CornerRadius="6" Background="#A98BFF" BorderBrush="#3A3E4C" BorderThickness="1" HorizontalAlignment="Left" />
+                  <Border x:Name="ColorSwatch" Width="34" Height="28" CornerRadius="6" Background="#A98BFF" BorderBrush="#3A3E4C" BorderThickness="1" HorizontalAlignment="Left"
+                          Cursor="Hand" MouseLeftButtonDown="ColorSwatch_MouseLeftButtonDown" ToolTip="Abrir seletor de cores" />
                 </StackPanel>
                 <TextBox x:Name="ColorField" VerticalAlignment="Bottom" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
               </DockPanel>
@@ -740,7 +772,12 @@
                   </StackPanel>
                   <StackPanel Grid.Column="4">
                     <TextBlock Text="COR" Style="{StaticResource FieldLabel}" />
-                    <TextBox x:Name="ParticleColorField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
+                    <DockPanel>
+                      <Border x:Name="ParticleColorSwatch" DockPanel.Dock="Right" Width="24" Height="24" Margin="4,0,0,0"
+                              CornerRadius="5" Background="#FFFFFF" BorderBrush="#3A3E4C" BorderThickness="1"
+                              Cursor="Hand" MouseLeftButtonDown="ParticleColorSwatch_MouseLeftButtonDown" ToolTip="Abrir seletor de cores" />
+                      <TextBox x:Name="ParticleColorField" FontSize="10.5" LostFocus="InspectorField_LostFocus" KeyDown="InspectorField_KeyDown" />
+                    </DockPanel>
                   </StackPanel>
                 </Grid>
                 <CheckBox x:Name="ParticleGravityCheck" Content="Afetar partículas com gravidade" Click="ParticleGravity_Click" />
@@ -785,7 +822,7 @@
           <TextBlock x:Name="StatusText" Text="PRONTO" FontSize="9.5" FontWeight="SemiBold" Foreground="#8A8E9E" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-          <TextBlock x:Name="LanguageVersionText" Text="VelvX Language · 0.4.0" FontSize="9.5" Foreground="#5E6372" Margin="0,0,16,0" />
+          <TextBlock x:Name="LanguageVersionText" Text="VelvX Language · 0.4.5" FontSize="9.5" Foreground="#5E6372" Margin="0,0,16,0" />
           <TextBlock x:Name="FpsText" Text="" FontSize="9.5" Foreground="#5E6372" Margin="0,0,16,0" />
           <TextBlock x:Name="StatusLineText" Text="Ln 1, Col 1" FontSize="9.5" Foreground="#5E6372" />
         </StackPanel>

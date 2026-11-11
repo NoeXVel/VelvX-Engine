@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
@@ -322,8 +323,14 @@ public sealed class ModelAsset
 
         if (mesh.HasTextureCoords(0))
         {
+            // O Assimp usa a origem UV no canto inferior esquerdo; o WPF usa o
+            // canto superior esquerdo. Inverter V mantém a textura alinhada à malha.
             geometry.TextureCoordinates = new PointCollection(mesh.TextureCoordinateChannels[0]
-                .Select(uv => new Point(uv.X, uv.Y)));
+                .Select(uv => new Point(uv.X, 1.0 - uv.Y)));
+        }
+        else
+        {
+            geometry.TextureCoordinates = BuildPlanarTextureCoordinates(mesh);
         }
 
         var indices = mesh.GetIndices();
@@ -331,6 +338,63 @@ public sealed class ModelAsset
         foreach (var index in indices) collection.Add(index);
         geometry.TriangleIndices = collection;
         return geometry;
+    }
+
+    /// <summary>
+    /// Gera UVs por projeção planar para modelos sem coordenadas de textura.
+    /// Cada vértice usa o plano perpendicular ao eixo dominante da normal, o que
+    /// evita que a textura fique presa em uma única cor.
+    /// </summary>
+    private static PointCollection BuildPlanarTextureCoordinates(Mesh mesh)
+    {
+        var vertices = mesh.Vertices;
+        if (vertices.Count == 0) return [];
+
+        var minX = vertices.Min(vertex => vertex.X);
+        var minY = vertices.Min(vertex => vertex.Y);
+        var minZ = vertices.Min(vertex => vertex.Z);
+        var maxX = vertices.Max(vertex => vertex.X);
+        var maxY = vertices.Max(vertex => vertex.Y);
+        var maxZ = vertices.Max(vertex => vertex.Z);
+
+        var spanX = Math.Max(0.0001f, maxX - minX);
+        var spanY = Math.Max(0.0001f, maxY - minY);
+        var spanZ = Math.Max(0.0001f, maxZ - minZ);
+
+        var points = new PointCollection(vertices.Count);
+        for (var index = 0; index < vertices.Count; index++)
+        {
+            var vertex = vertices[index];
+            var normal = mesh.HasNormals && index < mesh.Normals.Count
+                ? mesh.Normals[index]
+                : new Vector3D(0, 1, 0);
+
+            var ax = Math.Abs(normal.X);
+            var ay = Math.Abs(normal.Y);
+            var az = Math.Abs(normal.Z);
+
+            float u;
+            float v;
+            if (ay >= ax && ay >= az)
+            {
+                u = (vertex.X - minX) / spanX;
+                v = (vertex.Z - minZ) / spanZ;
+            }
+            else if (ax >= az)
+            {
+                u = (vertex.Z - minZ) / spanZ;
+                v = (vertex.Y - minY) / spanY;
+            }
+            else
+            {
+                u = (vertex.X - minX) / spanX;
+                v = (vertex.Y - minY) / spanY;
+            }
+
+            points.Add(new Point(u, 1.0 - v));
+        }
+
+        return points;
     }
 
     private static Material CreateMaterial(Scene scene, int index, string directory)
@@ -401,10 +465,14 @@ public sealed class ModelAsset
             }
 
             if (bitmap is null) return null;
+            // O viewport relativo (0,0,1,1) faz o UV 0..1 cobrir a imagem inteira,
+            // respeitando o mapeamento da malha em vez de dimensionar em pixels.
             var brush = new ImageBrush(bitmap)
             {
                 Stretch = Stretch.Fill,
-                ViewportUnits = BrushMappingMode.Absolute
+                ViewportUnits = BrushMappingMode.RelativeToBoundingBox,
+                Viewport = new Rect(0, 0, 1, 1),
+                TileMode = TileMode.None
             };
             brush.Freeze();
             return brush;
@@ -453,8 +521,8 @@ public sealed class ModelAsset
             _baseNormals = mesh.Normals.Select(normal =>
                 new System.Windows.Media.Media3D.Vector3D(normal.X, normal.Y, normal.Z)).ToArray();
             _textureCoordinates = mesh.HasTextureCoords(0)
-                ? mesh.TextureCoordinateChannels[0].Select(uv => new Point(uv.X, uv.Y)).ToArray()
-                : [];
+                ? mesh.TextureCoordinateChannels[0].Select(uv => new Point(uv.X, 1.0 - uv.Y)).ToArray()
+                : BuildPlanarTextureCoordinates(mesh).ToArray();
             _indices = new Int32Collection(mesh.GetIndices());
             _bindings = new List<BoneBinding>[_basePositions.Length];
             for (var index = 0; index < _bindings.Length; index++) _bindings[index] = [];

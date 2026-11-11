@@ -188,6 +188,16 @@ public sealed class Interpreter
             : DefaultValue(declaration.TypeName);
 
         value = Coerce(declaration.TypeName, value, declaration.Line);
+
+        if (declaration.IsGlobal)
+        {
+            // 'global' é declarada uma única vez e sobrevive entre Main, InGame e
+            // chamadas de função. Declarações repetidas preservam o valor atual;
+            // use uma atribuição comum para reiniciar.
+            _globals.Define(declaration.Name, value);
+            return;
+        }
+
         if (!scope.Define(declaration.Name, value))
             throw new VelvXException(
                 $"A variável '{declaration.Name}' já foi declarada neste escopo.",

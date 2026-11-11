@@ -127,16 +127,39 @@ public partial class MaterialWindow : Window
 
     private void AlbedoField_TextChanged(object sender, TextChangedEventArgs e) => UpdatePreview();
 
+    private void AlbedoSwatch_Click(object sender, MouseButtonEventArgs e)
+    {
+        var picked = ColorPickerWindow.Pick(this, AlbedoField.Text, "Cor base do material");
+        if (picked is null) return;
+        AlbedoField.Text = picked;
+        UpdatePreview();
+    }
+
+    private void EmissionSwatch_Click(object sender, MouseButtonEventArgs e)
+    {
+        var picked = ColorPickerWindow.Pick(this, EmissionField.Text, "Cor da emissão");
+        if (picked is null) return;
+        EmissionField.Text = picked;
+        UpdatePreview();
+    }
+
     private void UpdatePreview()
+    {
+        var albedo = ParseColor(AlbedoField.Text, Color.FromRgb(169, 139, 255));
+        PreviewSwatch.Background = new SolidColorBrush(albedo);
+        AlbedoSwatch.Background = new SolidColorBrush(albedo);
+        EmissionSwatch.Background = new SolidColorBrush(ParseColor(EmissionField.Text, Colors.Black));
+    }
+
+    private static Color ParseColor(string text, Color fallback)
     {
         try
         {
-            var color = (Color)ColorConverter.ConvertFromString(AlbedoField.Text.Trim());
-            PreviewSwatch.Background = new SolidColorBrush(color);
+            return (Color)ColorConverter.ConvertFromString(text.Trim());
         }
         catch
         {
-            PreviewSwatch.Background = new SolidColorBrush(Color.FromRgb(169, 139, 255));
+            return fallback;
         }
     }
 

@@ -20,8 +20,8 @@ public static class VelvXHighlighting
   <RuleSet ignoreCase="false">
     <Span color="Comment" begin="##" />
     <Span color="String" begin="&quot;" end="&quot;" />
-    <Rule color="Keyword">\b(func|var|if|else|while|for|return|true|false|null|new|this|and|or|not)\b</Rule>
-    <Rule color="BuiltIn">\b(console|game|math|Scene|Scenes|Assets|Input|Vector2|Vector3)\b</Rule>
+    <Rule color="Keyword">\b(global|func|var|if|else|while|return|true|false|null|new|this|and|or|not)\b</Rule>
+    <Rule color="BuiltIn">\b(console|game|Scene|Scenes|Assets|Vector2|Vector3)\b</Rule>
     <Rule color="Function">\b[A-Za-z_][A-Za-z0-9_]*(?=\s*\()</Rule>
     <Rule color="Number">\b\d+(?:\.\d+)?\b</Rule>
   </RuleSet>

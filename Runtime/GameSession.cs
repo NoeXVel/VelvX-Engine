@@ -17,9 +17,9 @@ public sealed class GameSession : IScriptHost
     private readonly Dictionary<string, VelvVector3> _bodyVelocities = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, TriggerPair> _triggerPairs = new(StringComparer.OrdinalIgnoreCase);
     private readonly ScriptObject _sceneRoot;
-    private readonly ScriptObject _this;
-    private readonly ScriptObject? _playerComponent;
-    private readonly SceneObject? _playerSceneObject;
+    private ScriptObject _this;
+    private ScriptObject? _playerComponent;
+    private SceneObject? _playerSceneObject;
     private readonly string _scriptSource;
     private readonly string? _sceneDirectory;
     private Interpreter? _interpreter;
@@ -45,31 +45,47 @@ public sealed class GameSession : IScriptHost
         _sceneRoot = instance.Root;
         _activeSceneKey = instance.Key;
 
-        _playerSceneObject = scene.Objects.FirstOrDefault(item =>
-                                !string.IsNullOrWhiteSpace(item.Script) &&
-                                string.Equals(item.Script, project?.Info.EntryScript, StringComparison.OrdinalIgnoreCase))
-                            ?? scene.Objects.FirstOrDefault(item =>
-                                item.Type is "CharacterBody3D" or "CharacterBody2D" ||
-                                item.HasComponent("CharacterBody"))
-                            ?? scene.Objects.FirstOrDefault();
-
-        if (_playerSceneObject is not null)
+        var boundPlayer = TryBindPlayer(instance);
+        _this = boundPlayer ?? new ScriptObject("Player", scene.Is3D ? "CharacterBody3D" : "CharacterBody2D");
+        if (boundPlayer is null)
         {
-            _this = instance.Objects[_playerSceneObject.Id];
-            var componentName = scene.Is3D ? "CharacterBody3D" : "CharacterBody2D";
-            if (_this.TryGet(componentName, out var component) && component is ScriptObject componentObject)
-                _playerComponent = componentObject;
-            else if (_this.TryGet("CharacterBody", out var generic) && generic is ScriptObject genericObject)
-                _playerComponent = genericObject;
-        }
-        else
-        {
-            _this = new ScriptObject("Player", scene.Is3D ? "CharacterBody3D" : "CharacterBody2D");
             _this.Set("position", scene.Is3D ? new VelvVector3(0, 0, 0) : new VelvVector2(0, 0));
             _this.Set("velocity", scene.Is3D ? new VelvVector3(0, 0, 0) : new VelvVector2(0, 0));
         }
 
         _sceneManager = CreateSceneManager();
+    }
+
+    /// <summary>
+    /// Encontra o ator que representa o jogador em uma cena e liga o "this" do
+    /// script de entrada a ele. É usado no início do Play e sempre que a cena
+    /// ativa muda, permitindo que cada fase tenha o seu próprio Player.
+    /// </summary>
+    private ScriptObject? TryBindPlayer(SceneInstance instance)
+    {
+        var entryScript = _project?.Info.EntryScript;
+        var candidate = instance.Document.Objects.FirstOrDefault(item =>
+                            !string.IsNullOrWhiteSpace(item.Script) &&
+                            string.Equals(item.Script, entryScript, StringComparison.OrdinalIgnoreCase))
+                        ?? instance.Document.Objects.FirstOrDefault(item =>
+                            item.Type is "CharacterBody3D" or "CharacterBody2D" ||
+                            item.HasComponent("CharacterBody"))
+                        ?? instance.Document.Objects.FirstOrDefault();
+
+        if (candidate is null || !instance.Objects.TryGetValue(candidate.Id, out var scriptObject))
+            return null;
+
+        _playerSceneObject = candidate;
+        _this = scriptObject;
+        _playerComponent = null;
+
+        var componentName = instance.Document.Is3D ? "CharacterBody3D" : "CharacterBody2D";
+        if (_this.TryGet(componentName, out var component) && component is ScriptObject componentObject)
+            _playerComponent = componentObject;
+        else if (_this.TryGet("CharacterBody", out var generic) && generic is ScriptObject genericObject)
+            _playerComponent = genericObject;
+
+        return scriptObject;
     }
 
     public event Action<string, ScriptLogLevel>? Output;
@@ -220,6 +236,7 @@ public sealed class GameSession : IScriptHost
                 document.Mode = _project?.Info.Mode ?? "3D";
 
             var instance = AddScene(document, path);
+            if (_started) StartComponentScripts(instance);
             if (makeActive) SetActiveScene(instance.Key);
             Output?.Invoke($"Cena '{document.Name}' carregada.", ScriptLogLevel.Info);
             SceneLoaded?.Invoke(instance.Key, document);
@@ -241,6 +258,7 @@ public sealed class GameSession : IScriptHost
         {
             var next = _scenes.Values.FirstOrDefault(item => !ReferenceEquals(item, scene));
             _activeSceneKey = next?.Key;
+            if (next is not null) TryBindPlayer(next);
         }
 
         _componentScripts.RemoveAll(component => ReferenceEquals(component.Scene, scene));
@@ -262,6 +280,7 @@ public sealed class GameSession : IScriptHost
 
         if (string.Equals(scene.Key, _activeSceneKey, StringComparison.OrdinalIgnoreCase)) return true;
         _activeSceneKey = scene.Key;
+        TryBindPlayer(scene);
         ActiveSceneChanged?.Invoke(scene.Key, scene.Document);
         return true;
     }
@@ -558,29 +577,32 @@ public sealed class GameSession : IScriptHost
 
     private void StartComponentScripts()
     {
-        foreach (var scene in _scenes.Values)
+        foreach (var scene in _scenes.Values) StartComponentScripts(scene);
+    }
+
+    /// <summary>Inicia os scripts de componentes de uma cena recém-carregada.</summary>
+    private void StartComponentScripts(SceneInstance scene)
+    {
+        foreach (var item in scene.Document.Objects)
         {
-            foreach (var item in scene.Document.Objects)
+            var scripts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(item.Script) &&
+                !string.Equals(item.Script, _project?.Info.EntryScript, StringComparison.OrdinalIgnoreCase) &&
+                !IsGlobalScript(item.Script))
+                scripts.Add(item.Script);
+
+            foreach (var component in item.Components)
             {
-                var scripts = new List<string>();
-                if (!string.IsNullOrWhiteSpace(item.Script) &&
-                    !string.Equals(item.Script, _project?.Info.EntryScript, StringComparison.OrdinalIgnoreCase) &&
-                    !IsGlobalScript(item.Script))
-                    scripts.Add(item.Script);
-
-                foreach (var component in item.Components)
-                {
-                    if (!component.Enabled || !string.Equals(component.Type, "Script", StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    if (!string.IsNullOrWhiteSpace(component.Script) &&
-                        !IsGlobalScript(component.Script) &&
-                        !scripts.Contains(component.Script, StringComparer.OrdinalIgnoreCase))
-                        scripts.Add(component.Script);
-                }
-
-                foreach (var scriptPath in scripts)
-                    TryStartComponentScript(scene, item, scriptPath);
+                if (!component.Enabled || !string.Equals(component.Type, "Script", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (!string.IsNullOrWhiteSpace(component.Script) &&
+                    !IsGlobalScript(component.Script) &&
+                    !scripts.Contains(component.Script, StringComparer.OrdinalIgnoreCase))
+                    scripts.Add(component.Script);
             }
+
+            foreach (var scriptPath in scripts)
+                TryStartComponentScript(scene, item, scriptPath);
         }
     }
 

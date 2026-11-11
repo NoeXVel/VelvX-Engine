@@ -4,62 +4,50 @@
   "objects": [
     {
       "id": "background",
-      "name": "Fundo",
+      "name": "Fundo da Clareira",
       "type": "Rectangle",
-      "position": [
-        0,
-        0,
-        0
-      ],
-      "size": [
-        22,
-        13
-      ],
-      "color": "#121722"
+      "position": [0, 0, 0],
+      "size": [22, 13],
+      "color": "#141B2A"
+    },
+    {
+      "id": "hills",
+      "name": "Colinas ao Fundo",
+      "type": "Ellipse",
+      "position": [0, -2.6, 0],
+      "size": [26, 7],
+      "color": "#1B2333"
     },
     {
       "id": "ground",
       "name": "Chão",
       "type": "Rectangle",
-      "position": [
-        0,
-        -4.4,
-        0
-      ],
-      "size": [
-        18,
-        0.6
-      ],
+      "position": [0, -4.4, 0],
+      "size": [22, 0.8],
       "color": "#242833"
     },
     {
-      "id": "platform",
-      "name": "Plataforma",
+      "id": "platform-left",
+      "name": "Plataforma Esquerda",
       "type": "Rectangle",
-      "position": [
-        -4,
-        -1.2,
-        0
-      ],
-      "size": [
-        4,
-        0.5
-      ],
+      "position": [-5.5, -2.2, 0],
+      "size": [4, 0.5],
+      "color": "#2E3242"
+    },
+    {
+      "id": "platform-right",
+      "name": "Plataforma Direita",
+      "type": "Rectangle",
+      "position": [5.5, -1.4, 0],
+      "size": [4, 0.5],
       "color": "#2E3242"
     },
     {
       "id": "orb",
       "name": "Orbe",
       "type": "Sprite",
-      "position": [
-        4,
-        1.6,
-        0
-      ],
-      "size": [
-        1.2,
-        1.2
-      ],
+      "position": [-4, 1.6, 0],
+      "size": [1.2, 1.2],
       "sprite": {
         "path": "Assets/Sprites/orb.gif",
         "frameWidth": 32,
@@ -68,21 +56,27 @@
         "rows": 1,
         "fps": 8,
         "loop": true
-      }
+      },
+      "components": [
+        {
+          "type": "ParticleEmitter",
+          "amount": 36,
+          "lifetime": 1.8,
+          "speed": 0.5,
+          "particleSize": 0.07,
+          "color": "#8FD8FF",
+          "useGravity": false,
+          "gravity": 0,
+          "enabled": true
+        }
+      ]
     },
     {
       "id": "star",
       "name": "Estrela",
       "type": "Sprite",
-      "position": [
-        -4,
-        0.2,
-        0
-      ],
-      "size": [
-        0.9,
-        0.9
-      ],
+      "position": [-4, 0.4, 0],
+      "size": [0.9, 0.9],
       "sprite": {
         "path": "Assets/Sprites/star.png",
         "frameWidth": 32,
@@ -94,18 +88,49 @@
       }
     },
     {
+      "id": "crystal",
+      "name": "Cristal Giratório",
+      "type": "Ellipse",
+      "position": [2.6, -0.2, 0],
+      "size": [0.9, 1.6],
+      "color": "#69E0FF",
+      "components": [
+        {
+          "type": "Rotator",
+          "axis": "Z",
+          "speed": 60,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "portal",
+      "name": "Portal da Floresta",
+      "type": "Ellipse",
+      "position": [8.2, -3, 0],
+      "size": [1.8, 2.6],
+      "color": "#7C5CFF",
+      "tag": "portal",
+      "components": [
+        {
+          "type": "ParticleEmitter",
+          "amount": 46,
+          "lifetime": 2.0,
+          "speed": 0.6,
+          "particleSize": 0.08,
+          "color": "#A98BFF",
+          "useGravity": false,
+          "gravity": 0,
+          "enabled": true
+        }
+      ]
+    },
+    {
       "id": "hero-deco",
       "name": "Herói (sprite)",
       "type": "Sprite",
-      "position": [
-        5.5,
-        -3.4,
-        0
-      ],
-      "size": [
-        1.6,
-        1.6
-      ],
+      "position": [5.5, -3.5, 0],
+      "size": [1.6, 1.6],
       "sprite": {
         "path": "Assets/Sprites/hero_sheet.png",
         "frameWidth": 32,
@@ -120,17 +145,11 @@
       "id": "player",
       "name": "Player2D",
       "type": "CharacterBody2D",
-      "position": [
-        -1.5,
-        -2.4,
-        0
-      ],
-      "size": [
-        1,
-        1
-      ],
+      "position": [-6, -3.4, 0],
+      "size": [1, 1],
       "color": "#A98BFF",
-      "script": "Scripts/Main.velv"
+      "script": "Scripts/Main.velv",
+      "tag": "player"
     }
   ]
 }

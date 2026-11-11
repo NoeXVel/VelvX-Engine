@@ -2,14 +2,41 @@
 
 Cada pasta aqui com um `template.json` aparece na tela **Novo projeto** do launcher. Os templates oficiais desta versão são:
 
-| Pasta | Modo | Conteúdo |
-| --- | --- | --- |
-| `Starter-3D` | 3D | chão, pilares, plataforma, esfera animada, Player, luz pontual, Global Volume e streaming para a cena `Arena` |
-| `Starter-2D` | 2D | fundo, chão, plataforma, orbe GIF, estrela, spritesheet do herói, Player e streaming para `Floresta` |
-| `Empty-3D` | 3D | cenário vazio: apenas a câmera do jogo e o script de entrada |
-| `Empty-2D` | 2D | cenário vazio: apenas a câmera do jogo e o script de entrada |
+| Pasta | Modo | Fase 1 | Fase 2 |
+| --- | --- | --- | --- |
+| `Starter-3D` | 3D | **Salão de Entrada**: salão fechado, pilares, plataforma, núcleo giratório, portal roxo com partículas e luz própria | **Arena do Núcleo**: arena aberta, núcleo pulsante com partículas, quatro pilares, portal laranja de retorno |
+| `Starter-2D` | 2D | **Clareira**: fundo em camadas, plataformas, orbe, cristal giratório, portal roxo com partículas | **Floresta**: névoa, árvores, vaga-lumes, raiz elevada, portal laranja de volta |
+| `Empty-3D` | 3D | cenário vazio: apenas a câmera do jogo e o script de entrada | — |
+| `Empty-2D` | 2D | cenário vazio: apenas a câmera do jogo e o script de entrada | — |
 
-Os templates Starter trazem cenas de streaming, pastas de assets, um prefab de exemplo e scripts comentados com inputs personalizados. Os templates Empty são ideais para começar um jogo do zero, sem objetos de exemplo.
+Os templates Starter são mini-jogos funcionais: **WASD/setas** movem o Player, o portal tem uma `BoxVolume` (3D) ou uma elipse luminosa (2D) com emissor de partículas, e **E** troca de fase. Cada cena tem o seu próprio Player, então o `this` do script aponta para o jogador da fase atual.
+
+## Como a troca de fase funciona
+
+Abra `Scripts/Main.velv` de qualquer Starter. O fluxo é sempre o mesmo:
+
+```velv
+if not Scene("Arena").is_loaded()
+{
+    Scene("Arena").load();       # carrega o arquivo .scene.json em memória
+}
+
+Scene("Arena").set_active();     # a cena vira ativa e o "this" passa ao Player dela
+this.position = new.Vector3(0, 0.1, -9);   # ponto de entrada da fase
+```
+
+- `load()` faz **streaming**: a cena fica na memória e aparece no rodapé da hierarquia.
+- `set_active()` troca o viewport, o Player e os inputs para a nova cena.
+- `Scenes.current` devolve o nome da fase atual; use isso para separar a lógica de cada sala.
+- `espera` (uma variável `global`) evita trocar de fase várias vezes enquanto **E** continua pressionado.
+
+Para criar uma terceira fase, copie `Scenes/Arena.scene.json`, renomeie o arquivo (por exemplo `Chefe.scene.json`), ajuste os atores e adicione o novo portal no script com `Scene("Chefe").load()` / `set_active()`.
+
+## Iluminação, volumes e efeitos nos exemplos
+
+- **3D**: `PointLight` no salão, no portal e nos cantos da arena; `GlobalVolume` para tingir o ambiente; `BoxVolume` nos portais com pulsação ao tocar um corpo; `ParticleEmitter` nas faíscas do portal e do núcleo; névoa (`environment.fogDensity`) em cada fase.
+- **2D**: fundos em camadas (céu, colinas, névoa), sprites GIF animados, `ParticleEmitter` nos portais e um `Rotator` girando o cristal.
+- **Hierarquia**: os portais são atores `GameObject` com filhos (`BoxVolume`, luz e partículas). Mova o portal pai e os filhos acompanham.
 
 ## Criar o seu template
 
@@ -24,7 +51,7 @@ Os templates Starter trazem cenas de streaming, pastas de assets, um prefab de e
   "name": "Meu template",
   "description": "Minha base de jogo personalizada.",
   "mode": "3D",
-  "version": "0.4.0"
+  "version": "0.4.5"
 }
 ```
 
@@ -43,6 +70,7 @@ Campos:
 - Todo o conteúdo da pasta é copiado para o novo projeto.
 - `template.json`, `.gitkeep` e pastas ocultas (começando com `.`) **não** são copiados.
 - A Engine cria o arquivo `<NomeDoProjeto>.velvxproj` com a cena inicial `Scenes/Main.scene.json` e o script de entrada `Scripts/Main.velv`.
+- Todas as cenas `*.scene.json` encontradas em `Scenes/` são registradas no projeto automaticamente, então os portais já funcionam na primeira execução.
 
 Se o seu template usar outros nomes de cena/script, ajuste `StartScene` e `EntryScript` no `.velvxproj` gerado ou mantenha o padrão acima.
 

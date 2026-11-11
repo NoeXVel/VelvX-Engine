@@ -16,11 +16,12 @@ public sealed class BlockStmt(int line, List<Stmt> statements) : Stmt(line)
     public List<Stmt> Statements { get; } = statements;
 }
 
-public sealed class VarDeclStmt(int line, string name, string? typeName, Expr? initializer) : Stmt(line)
+public sealed class VarDeclStmt(int line, string name, string? typeName, Expr? initializer, bool isGlobal = false) : Stmt(line)
 {
     public string Name { get; } = name;
     public string? TypeName { get; } = typeName;
     public Expr? Initializer { get; } = initializer;
+    public bool IsGlobal { get; } = isGlobal;
 }
 
 public sealed class FunctionDeclStmt(int line, string name, List<Parameter> parameters, BlockStmt body) : Stmt(line)

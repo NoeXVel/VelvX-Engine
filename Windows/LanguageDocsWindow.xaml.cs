@@ -52,17 +52,22 @@ public partial class LanguageDocsWindow : Window
     private void Parse(IEnumerable<string> lines)
     {
         DocSection? current = null;
+        var inFence = false;
         foreach (var raw in lines)
         {
             var line = raw.TrimEnd();
-            if (line.StartsWith("## "))
+            if (line.TrimStart().StartsWith("```"))
+            {
+                inFence = !inFence;
+            }
+            else if (!inFence && line.StartsWith("## "))
             {
                 current = new DocSection(line[3..].Trim(), []);
                 _sections.Add(current);
                 continue;
             }
 
-            if (line.StartsWith("# "))
+            else if (!inFence && line.StartsWith("# "))
             {
                 if (current is null)
                 {
@@ -86,7 +91,29 @@ public partial class LanguageDocsWindow : Window
     private void SectionList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (SectionList.SelectedItem is not DocSection section) return;
-        DocViewer.Document = BuildDocument(section);
+        try
+        {
+            DocViewer.Document = BuildDocument(section);
+        }
+        catch (Exception exception)
+        {
+            DocViewer.Document = ErrorDocument(section.Title, exception.Message);
+        }
+    }
+
+    private static FlowDocument ErrorDocument(string title, string message)
+    {
+        var document = new FlowDocument
+        {
+            FontFamily = new FontFamily("Segoe UI"),
+            FontSize = 12.5,
+            Foreground = new SolidColorBrush(Color.FromRgb(218, 214, 230)),
+            PagePadding = new Thickness(0)
+        };
+        document.Blocks.Add(Heading(title, 18, "#EDE9FF", new Thickness(0, 0, 0, 12)));
+        document.Blocks.Add(new Paragraph(new Run(
+            $"Não foi possível renderizar este tópico: {message}")));
+        return document;
     }
 
     private static FlowDocument BuildDocument(DocSection section)
@@ -137,7 +164,10 @@ public partial class LanguageDocsWindow : Window
                 var code = new List<string>();
                 index++;
                 while (index < lines.Count && !lines[index].Trim().StartsWith("```"))
+                {
                     code.Add(lines[index]);
+                    index++;
+                }
                 document.Blocks.Add(CodeBlock(string.Join("\n", code)));
                 continue;
             }

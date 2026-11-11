@@ -1,24 +1,61 @@
-## Ponto de entrada do jogo 3D.
+## Jogo de exemplo 3D com duas fases ligadas por portais.
+##
 ## Main() roda uma vez, quando o Play começa.
-## InGame() roda a cada quadro — ideal para inputs e movimento.
+## InGame() roda a cada quadro — use para inputs, movimento e troca de fase.
+##
+## Como funciona a troca de cena:
+##   1. Scene("Arena").load()   carrega a cena em memória (streaming).
+##   2. Scene("Arena").set_active()  faz dela a cena ativa: o "this" passa a ser
+##      o Player daquela cena e o viewport mostra os atores dela.
+##   3. Cada cena tem o seu próprio Player, então o jogador reaparece no spawn
+##      definido no arquivo da cena (ajustado logo abaixo com this.position).
+##
+## Edite os limites e as posições para adaptar as salas ao seu jogo.
+
+global fase : Int = 1;
+global espera = 0.0;
 
 func Main()
 {
-    console.show("VelvX 3D pronta. Use WASD ou as setas para mover o Player.");
-    console.show("Pressione E para carregar a Arena por streaming.");
+    console.show("Fase 1 — Salão de Entrada.");
+    console.show("WASD/setas movem. Pressione E no portal roxo para entrar na Arena.");
 }
 
 func InGame()
 {
-    ## Ordem dos argumentos: positivo X, negativo X, positivo Y, negativo Y.
-    ## Os nomes abaixo são ações do projeto — edite em Projeto > Configurações > Entradas.
+    ## Ordem dos argumentos: positivo X, negativo X, positivo Z, negativo Z.
     var direcao = game.get_input_vectors("mover_direita", "mover_esquerda", "mover_baixo", "mover_cima");
     this.CharacterBody3D.velocity = new.Vector3(direcao.x * 6, 0, direcao.y * 6);
 
-    ## Streaming de nível: carrega a cena Arena uma única vez.
-    if game.get_input("interagir") and not Scene("Arena").is_loaded()
+    ## Evita trocar de fase várias vezes enquanto a tecla E continua pressionada.
+    espera = espera - game.delta_time;
+
+    if Scenes.current == "Main"
     {
-        Scene("Arena").load();
-        console.show("Arena carregada por streaming.");
+        if espera <= 0 and this.position.z > 6.0 and game.get_input("interagir")
+        {
+            if not Scene("Arena").is_loaded()
+            {
+                Scene("Arena").load();
+                console.show("Arena carregada por streaming.");
+            }
+
+            Scene("Arena").set_active();
+            this.position = new.Vector3(0, 0.1, -9);
+            fase = 2;
+            espera = 1.2;
+            console.show("Fase 2 — Arena do Núcleo. Volte pelo portal laranja.");
+        }
+    }
+    else
+    {
+        if espera <= 0 and this.position.z > 8.8 and game.get_input("interagir")
+        {
+            Scene("Main").set_active();
+            this.position = new.Vector3(0, 0.1, 0);
+            fase = 1;
+            espera = 1.2;
+            console.show("Fase 1 — Salão de Entrada.");
+        }
     }
 }

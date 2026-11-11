@@ -73,11 +73,21 @@
             </Grid.ColumnDefinitions>
             <StackPanel>
               <TextBlock Text="COR BASE (ALBEDO)" Style="{StaticResource FieldLabel}" />
-              <TextBox x:Name="AlbedoField" TextChanged="AlbedoField_TextChanged" />
+              <DockPanel>
+                <Border x:Name="AlbedoSwatch" DockPanel.Dock="Right" Width="26" Height="26" Margin="5,0,0,0"
+                        CornerRadius="5" Background="#FFFFFF" BorderBrush="#3A3E4C" BorderThickness="1"
+                        Cursor="Hand" MouseLeftButtonDown="AlbedoSwatch_Click" ToolTip="Abrir seletor de cores" />
+                <TextBox x:Name="AlbedoField" TextChanged="AlbedoField_TextChanged" />
+              </DockPanel>
             </StackPanel>
             <StackPanel Grid.Column="2">
               <TextBlock Text="COR DA EMISSÃO" Style="{StaticResource FieldLabel}" />
-              <TextBox x:Name="EmissionField" TextChanged="AlbedoField_TextChanged" />
+              <DockPanel>
+                <Border x:Name="EmissionSwatch" DockPanel.Dock="Right" Width="26" Height="26" Margin="5,0,0,0"
+                        CornerRadius="5" Background="#FFFFFF" BorderBrush="#3A3E4C" BorderThickness="1"
+                        Cursor="Hand" MouseLeftButtonDown="EmissionSwatch_Click" ToolTip="Abrir seletor de cores" />
+                <TextBox x:Name="EmissionField" TextChanged="AlbedoField_TextChanged" />
+              </DockPanel>
             </StackPanel>
           </Grid>
 

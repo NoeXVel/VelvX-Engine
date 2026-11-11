@@ -1,8 +1,7 @@
 {
   "id": "starter-3d",
   "name": "Projeto 3D",
-  "description": "Cena 3D com chão, pilares, esfera animada, iluminação, volumes e streaming para a Arena.",
+  "description": "Mini-jogo 3D com duas fases (Salão e Arena), portais com partículas, iluminação, volumes globais, hierarquia e troca de cena comentada.",
   "mode": "3D",
-  "version": "0.4.0"
+  "version": "0.4.5"
 }
-

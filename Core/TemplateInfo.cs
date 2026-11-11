@@ -10,7 +10,7 @@ public sealed class TemplateInfo
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     public string Mode { get; set; } = "2D";
-    public string Version { get; set; } = "0.4.0";
+    public string Version { get; set; } = "0.4.5";
 
     [JsonIgnore] public string FolderPath { get; set; } = "";
     [JsonIgnore] public string Glyph => Is3D ? "◈" : "▤";

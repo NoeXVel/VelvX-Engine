@@ -32,7 +32,8 @@ public sealed class Parser
 
     private Stmt Statement()
     {
-        if (Match(TokenType.Var)) return VarDeclaration();
+        if (Match(TokenType.Global)) return VarDeclaration(true);
+        if (Match(TokenType.Var)) return VarDeclaration(false);
         if (Match(TokenType.Func)) return FunctionDeclaration();
         if (Match(TokenType.If)) return IfStatement();
         if (Match(TokenType.While)) return WhileStatement();
@@ -41,10 +42,11 @@ public sealed class Parser
         return ExpressionStatement();
     }
 
-    private Stmt VarDeclaration()
+    private Stmt VarDeclaration(bool isGlobal)
     {
         var line = Previous().Line;
-        var name = Consume(TokenType.Identifier, "Esperava o nome da variável depois de 'var'.").Lexeme;
+        var keyword = isGlobal ? "global" : "var";
+        var name = Consume(TokenType.Identifier, $"Esperava o nome da variável depois de '{keyword}'.").Lexeme;
 
         string? typeName = null;
         if (Match(TokenType.Colon))
@@ -55,7 +57,7 @@ public sealed class Parser
             initializer = Expression();
 
         Consume(TokenType.Semicolon, "Esperava ';' depois da declaração da variável.");
-        return new VarDeclStmt(line, name, typeName, initializer);
+        return new VarDeclStmt(line, name, typeName, initializer, isGlobal);
     }
 
     private Stmt FunctionDeclaration()

@@ -1,8 +1,7 @@
 {
   "id": "starter-2d",
   "name": "Projeto 2D",
-  "description": "Cena 2D com fundo, plataforma, sprites, GIF animado, prefab e streaming para a Floresta.",
+  "description": "Mini-jogo 2D com duas fases (Clareira e Floresta), portais com partículas, sprites animados e troca de cena comentada.",
   "mode": "2D",
-  "version": "0.4.0"
+  "version": "0.4.5"
 }
-

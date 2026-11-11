@@ -4,7 +4,7 @@ namespace VelvX.Engine.Core;
 
 public static class EnginePaths
 {
-    public const string Version = "0.4.0";
+    public const string Version = "0.4.5";
     public const string Codename = "Bigorna";
     public const string Language = "VelvX Language";
 

@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using VelvX.Engine.Core;
+using NumericsVector3 = System.Numerics.Vector3;
 
 namespace VelvX.Engine.Rendering;
 
@@ -45,7 +46,7 @@ public sealed class Scene2DView : FrameworkElement
     private bool _draggingGizmo;
     private int _dragAxis = -1;
     private double _dragStartMouse;
-    private double _dragStartValue;
+    private double[] _dragStartPosition = [0, 0];
     private double _lastTick;
 
     public Scene2DView()
@@ -71,6 +72,8 @@ public sealed class Scene2DView : FrameworkElement
 
     public event Action<string?>? ObjectSelected;
     public event Action<SceneObject>? TransformChanged;
+    public event Action? TransformStarted;
+    public event Action? TransformCompleted;
 
     public Func<string, string>? ResolveAsset { get; set; }
     public bool IsPlaying { get; set; }
@@ -149,9 +152,10 @@ public sealed class Scene2DView : FrameworkElement
         var center = new Point(ActualWidth / 2 + _pan.X, ActualHeight / 2 + _pan.Y);
         if (IsPlaying && _gameCamera is not null)
         {
+            var camera = WorldFrame(_gameCamera);
             center = new Point(
-                ActualWidth / 2 - _gameCamera.X * _zoom,
-                ActualHeight / 2 + _gameCamera.Y * _zoom);
+                ActualWidth / 2 - camera.X * _zoom,
+                ActualHeight / 2 + camera.Y * _zoom);
         }
 
         if (!IsPlaying) DrawGrid(dc, center);
@@ -170,7 +174,8 @@ public sealed class Scene2DView : FrameworkElement
                 continue;
             }
 
-            var position = new Point(center.X + item.X * _zoom, center.Y - item.Y * _zoom);
+            var frame = WorldFrame(item);
+            var position = new Point(center.X + frame.X * _zoom, center.Y - frame.Y * _zoom);
             var selected = !IsPlaying && string.Equals(item.Id, _selectedId, StringComparison.OrdinalIgnoreCase);
 
             if (item.Type == "Camera2D")
@@ -195,8 +200,8 @@ public sealed class Scene2DView : FrameworkElement
                 continue;
             }
 
-            var width = Math.Max(SizeValue(item, 0) * _zoom, 6);
-            var height = Math.Max(SizeValue(item, 1) * _zoom, 6);
+            var width = Math.Max(SizeValue(item, 0) * frame.ScaleX * _zoom, 6);
+            var height = Math.Max(SizeValue(item, 1) * frame.ScaleY * _zoom, 6);
             var rect = new Rect(position.X - width / 2, position.Y - height / 2, width, height);
 
             if (item.Type == "Sprite" && TryDrawSprite(dc, item, rect)) { }
@@ -245,11 +250,12 @@ public sealed class Scene2DView : FrameworkElement
 
     private void DrawVolume(DrawingContext dc, SceneObject item, Point center)
     {
-        var width = Math.Max(SizeValue(item, 0) * _zoom, 6);
-        var height = Math.Max(SizeValue(item, 1) * _zoom, 6);
+        var frame = WorldFrame(item);
+        var width = Math.Max(SizeValue(item, 0) * frame.ScaleX * _zoom, 6);
+        var height = Math.Max(SizeValue(item, 1) * frame.ScaleY * _zoom, 6);
         var rect = new Rect(
-            center.X + item.X * _zoom - width / 2,
-            center.Y - item.Y * _zoom - height / 2,
+            center.X + frame.X * _zoom - width / 2,
+            center.Y - frame.Y * _zoom - height / 2,
             width, height);
         var color = ParseColor(item.Color);
         dc.DrawRoundedRectangle(
@@ -269,6 +275,7 @@ public sealed class Scene2DView : FrameworkElement
         var radius = Math.Max(1, Math.Max(0.01, emitter.ParticleSize) * _zoom);
         var baseColor = ParseColor(emitter.Color);
         var now = _clock.Elapsed.TotalSeconds;
+        var origin = WorldFrame(item);
 
         for (var index = 0; index < count; index++)
         {
@@ -282,8 +289,8 @@ public sealed class Scene2DView : FrameworkElement
             var velocityX = Math.Cos(angle) * speed * spread;
             var velocityY = Math.Sin(angle) * speed * spread * 0.55 + speed * 0.35;
 
-            var x = item.X + velocityX * age;
-            var y = item.Y + velocityY * age -
+            var x = origin.X + velocityX * age;
+            var y = origin.Y + velocityY * age -
                     (emitter.UseGravity ? 0.5 * Math.Max(0, emitter.Gravity) * age * age : 0);
 
             var alpha = (byte)Math.Clamp(230 * (1 - cycle), 0, 255);
@@ -413,7 +420,8 @@ public sealed class Scene2DView : FrameworkElement
         if (item is null) return false;
 
         var center = new Point(ActualWidth / 2 + _pan.X, ActualHeight / 2 + _pan.Y);
-        var origin = new Point(center.X + item.X * _zoom, center.Y - item.Y * _zoom);
+        var frame = WorldFrame(item);
+        var origin = new Point(center.X + frame.X * _zoom, center.Y - frame.Y * _zoom);
         var xTip = new Point(origin.X + 72, origin.Y);
         var yTip = new Point(origin.X, origin.Y - 72);
 
@@ -425,8 +433,9 @@ public sealed class Scene2DView : FrameworkElement
         _draggingGizmo = true;
         _dragAxis = axis;
         _dragStartMouse = axis == 0 ? point.X : point.Y;
-        _dragStartValue = axis == 0 ? item.X : item.Y;
+        _dragStartPosition = [item.X, item.Y];
         CaptureMouse();
+        TransformStarted?.Invoke();
         return true;
     }
 
@@ -448,8 +457,15 @@ public sealed class Scene2DView : FrameworkElement
             else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
                 delta = Math.Round(delta * 10) / 10;
 
-            if (_dragAxis == 0) item.Position[0] = Math.Round(_dragStartValue + delta, 3);
-            else item.Position[1] = Math.Round(_dragStartValue + delta, 3);
+            var worldDelta = _dragAxis == 0
+                ? new NumericsVector3((float)delta, 0, 0)
+                : new NumericsVector3(0, (float)delta, 0);
+            var localDelta = _scene is null
+                ? worldDelta
+                : SceneGraph.WorldDeltaToLocalParent(_scene, item, worldDelta);
+
+            if (_dragAxis == 0) item.Position[0] = Math.Round(_dragStartPosition[0] + localDelta.X, 3);
+            else item.Position[1] = Math.Round(_dragStartPosition[1] + localDelta.Y, 3);
 
             _lastMouse = current;
             InvalidateVisual();
@@ -467,9 +483,11 @@ public sealed class Scene2DView : FrameworkElement
 
     private void OnMouseUp(object sender, MouseButtonEventArgs e)
     {
+        var wasDraggingGizmo = _draggingGizmo;
         _panning = false;
         _draggingGizmo = false;
         ReleaseMouseCapture();
+        if (wasDraggingGizmo) TransformCompleted?.Invoke();
     }
 
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)
@@ -511,11 +529,12 @@ public sealed class Scene2DView : FrameworkElement
             var item = _scene.Objects[index];
             if (!item.Visible) continue;
 
-            var width = Math.Max(SizeValue(item, 0) * _zoom, 8);
-            var height = Math.Max(SizeValue(item, 1) * _zoom, 8);
+            var frame = WorldFrame(item);
+            var width = Math.Max(SizeValue(item, 0) * frame.ScaleX * _zoom, 8);
+            var height = Math.Max(SizeValue(item, 1) * frame.ScaleY * _zoom, 8);
             var rect = new Rect(
-                center.X + item.X * _zoom - width / 2,
-                center.Y - item.Y * _zoom - height / 2,
+                center.X + frame.X * _zoom - width / 2,
+                center.Y - frame.Y * _zoom - height / 2,
                 width,
                 height);
 
@@ -523,6 +542,22 @@ public sealed class Scene2DView : FrameworkElement
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Posição de mundo e escala acumulada do ator, considerando a hierarquia.
+    /// Sem isso, filhos ficariam parados quando o pai se move no modo Play.
+    /// </summary>
+    private (double X, double Y, double ScaleX, double ScaleY) WorldFrame(SceneObject item)
+    {
+        if (_scene is null) return (item.X, item.Y, 1, 1);
+
+        var world = SceneGraph.WorldMatrix(_scene, item);
+        var scaleX = Math.Sqrt(world.M11 * world.M11 + world.M12 * world.M12);
+        var scaleY = Math.Sqrt(world.M21 * world.M21 + world.M22 * world.M22);
+        return (world.M41, world.M42,
+            scaleX < 0.0001 ? 1 : scaleX,
+            scaleY < 0.0001 ? 1 : scaleY);
     }
 
     private SpriteAsset? GetSprite(SceneObject item)

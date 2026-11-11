@@ -1,6 +1,6 @@
 # Arquitetura da VelvX Engine
 
-Este documento descreve como a versão **0.4.0 (Bigorna — Fix)** está organizada e quais são os pontos de extensão para as próximas etapas.
+Este documento descreve como a versão **0.4.5 (Bigorna — Fix)** está organizada e quais são os pontos de extensão para as próximas etapas.
 
 ## Visão geral
 

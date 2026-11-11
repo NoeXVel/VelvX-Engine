@@ -4,7 +4,7 @@ A VelvX Language é a linguagem de script da VelvX Engine. Ela foi pensada para 
 
 Scripts usam a extensão `.velv`. O ponto de entrada padrão de um projeto é `Scripts/Main.velv`, mas cada ator também pode executar seu próprio script por meio do componente **Script**.
 
-> Este documento descreve a linguagem da VelvX Engine 0.4.0. Se você está começando, leia as seções na ordem e use os exemplos como base.
+> Este documento descreve a linguagem da VelvX Engine 0.4.5. Se você está começando, leia as seções na ordem e use os exemplos como base.
 
 ---
 
@@ -79,7 +79,40 @@ pontos *= 2;    # 26
 pontos /= 2;    # 13
 ```
 
-Uma variável criada dentro de uma função existe apenas naquela função. Variáveis globais podem ser declaradas no topo do arquivo.
+Uma variável criada com `var` dentro de uma função existe apenas enquanto aquela chamada acontece: no quadro seguinte ela volta a não existir. Para guardar valores entre quadros, entre `Main` e `InGame` ou entre funções diferentes, use `global`.
+
+### Variáveis globais persistentes
+
+`global` declara uma variável que pertence ao script inteiro e sobrevive a todas as chamadas de função e a todos os quadros do jogo:
+
+```velv
+global pontuacao : Int = 0;
+global tempo_de_jogo = 0.0;
+
+func Main()
+{
+    pontuacao = 0;            # reinicia ao começar a partida
+    tempo_de_jogo = 0;
+}
+
+func InGame()
+{
+    tempo_de_jogo += game.delta_time;
+}
+
+func MarcarPonto()
+{
+    pontuacao += 10;
+    console.show("Pontos: {pontuacao}");
+}
+```
+
+Regras do `global`:
+
+- A declaração cria a variável uma única vez; se ela já existir, o valor atual é preservado. Para reiniciar, use uma atribuição comum, como `pontuacao = 0;`.
+- Qualquer função pode ler e alterar uma variável global apenas usando o nome dela.
+- `var` continua sendo o padrão para valores temporários, como um cálculo local ou o resultado de um laço.
+- O valor é reiniciado quando o modo Play começa de novo, pois cada partida carrega os scripts do zero.
 
 ---
 
@@ -358,6 +391,47 @@ console.show(Scenes.loaded());  # lista separada por vírgulas
 ```
 
 Uma cena carregada continua na memória (e aparece no rodapé da hierarquia) até ser descarregada ou até o Play terminar. Carregar duas vezes a mesma cena não duplica nada.
+
+### Fases com um Player por cena
+
+Para trocar de fase de verdade, cada `.scene.json` deve ter o seu próprio jogador (`CharacterBody3D` ou `CharacterBody2D`). Ao chamar `set_active()`, a Engine liga o `this` ao jogador **daquela cena**, carrega o viewport e passa a aplicar os inputs nele. Assim, a mesma função `InGame()` controla qualquer fase:
+
+```velv
+global fase : Int = 1;
+global espera = 0.0;
+
+func InGame()
+{
+    var direcao = game.get_input_vectors("mover_direita", "mover_esquerda", "mover_baixo", "mover_cima");
+    this.CharacterBody3D.velocity = new.Vector3(direcao.x * 6, 0, direcao.y * 6);
+
+    espera = espera - game.delta_time;   # evita repetir a troca com E pressionado
+
+    if Scenes.current == "Main"
+    {
+        if espera <= 0 and this.position.z > 6 and game.get_input("interagir")
+        {
+            if not Scene("Arena").is_loaded() { Scene("Arena").load(); }
+            Scene("Arena").set_active();
+            this.position = new.Vector3(0, 0.1, -9);   # spawn da nova fase
+            fase = 2;
+            espera = 1.2;
+        }
+    }
+    else
+    {
+        if espera <= 0 and this.position.z > 8.8 and game.get_input("interagir")
+        {
+            Scene("Main").set_active();
+            this.position = new.Vector3(0, 0.1, 0);
+            fase = 1;
+            espera = 1.2;
+        }
+    }
+}
+```
+
+Ordem recomendada: `load()` uma única vez (streaming), depois `set_active()` e, por fim, reposicione o `this` no ponto de entrada da fase. Use `Scenes.current` para saber em que fase o jogo está. Os templates **Projeto 3D** e **Projeto 2D** já vêm com duas fases completas montadas assim — abra `Scripts/Main.velv` deles para ver o exemplo funcionando.
 
 ### Assets
 
