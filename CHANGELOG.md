@@ -45,7 +45,7 @@ integrado, linguagem de script própria e distribuição profissional.
 - **Distribuição**: instalador nativo VelvXSetup.exe (wizard gráfico, atalhos,
   associações .velv/.ui, entrada em Adicionar/Remover Programas, desinstalador
   e modo silencioso `/S`) e pacote portable zip com conteúdo idêntico.
-- **Documentação**: GettingStarted, VelvLanguage e Architecture em `Docs/`.
+- **Documentação**: GettingStarted, VelvLanguage e Architecture em `docs/`.
 
 ### Corrigido
 

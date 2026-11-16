@@ -116,7 +116,7 @@ em `Build Release/`. Linux/macOS: mesmo comando CMake com GCC/Clang
 4. **Ferramentas → Exportar jogo** gera o jogo standalone.
 5. Duplo clique em `.velv` abre o Script IDE; em `.ui` abre o UI Editor.
 
-Guia completo: **[Docs/GettingStarted.md](Docs/GettingStarted.md)**.
+Guia completo: **[docs/GettingStarted.md](docs/GettingStarted.md)**.
 
 ## Demos incluídos
 
@@ -189,7 +189,7 @@ book InGame()            // executado a cada frame
   (clona, preservando tag/scripts — base do spawning de inimigos).
 
 Referência completa da linguagem (sintaxe, todos os nativos, padrões de jogo,
-depuração): **[Docs/VelvLanguage.md](Docs/VelvLanguage.md)**.
+depuração): **[docs/VelvLanguage.md](docs/VelvLanguage.md)**.
 
 ## Editor — atalhos e contexto
 
@@ -244,7 +244,7 @@ Source/
   exportado roda sem o editor e sem a árvore de fontes.
 
 Detalhes internos (pipeline de frame, interpretador, física, build):
-**[Docs/Architecture.md](Docs/Architecture.md)**.
+**[docs/Architecture.md](docs/Architecture.md)**.
 
 ## Testes
 
@@ -282,15 +282,15 @@ packaging\make_installer.bat    → dist\VelvXEngine-<versão>-setup.exe
   cria atalhos, associa `.velv`/`.ui` e inclui desinstalador integrado.
 
 Cada Release no GitHub deve conter os dois artefatos + as notas de versão.
-Veja [Docs/GettingStarted.md](Docs/GettingStarted.md) para o fluxo completo.
+Veja [docs/GettingStarted.md](docs/GettingStarted.md) para o fluxo completo.
 
 ## Documentação
 
 | Documento | Conteúdo |
 |---|---|
-| [Docs/GettingStarted.md](Docs/GettingStarted.md) | Instalação, tour do editor, atalhos, estrutura de projeto, física, UI, publicação. |
-| [Docs/VelvLanguage.md](Docs/VelvLanguage.md) | Referência completa da Velv Language: sintaxe, nativos, padrões de jogo, depuração. |
-| [Docs/Architecture.md](Docs/Architecture.md) | Arquitetura interna: pipeline de frame, interpretador, física, renderizador, build e testes. |
+| [docs/GettingStarted.md](docs/GettingStarted.md) | Instalação, tour do editor, atalhos, estrutura de projeto, física, UI, publicação. |
+| [docs/VelvLanguage.md](docs/VelvLanguage.md) | Referência completa da Velv Language: sintaxe, nativos, padrões de jogo, depuração. |
+| [docs/Architecture.md](docs/Architecture.md) | Arquitetura interna: pipeline de frame, interpretador, física, renderizador, build e testes. |
 
 ## Licença
 

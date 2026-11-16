@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VelvX Engine — Engine 2D/3D open-source com linguagem própria</title>
+<meta name="description" content="VelvX Engine: engine de jogos 2D/3D em C++20 e OpenGL, editor completo, linguagem Velv e instalador nativo. Baixe o setup ou a versão portátil.">
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html">
+      <img src="assets/img/icon.png" alt="Logo VelvX">
+      <span>VelvX Engine</span>
+      <span class="ver">v1.0.0</span>
+    </a>
+    <div class="nav-links">
+      <a href="#recursos">Recursos</a>
+      <a href="#download">Download</a>
+      <a href="#galeria">Galeria</a>
+      <a href="guide.html">Guia</a>
+      <a href="language.html">Velv</a>
+      <a href="architecture.html">Arquitetura</a>
+      <a class="nav-cta" href="https://github.com/NoeXVel/VelvX-Engine">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">Open-source &middot; MIT &middot; C++20 / OpenGL 3.3</span>
+      <h1>Crie jogos 2D e 3D com a <span class="grad">VelvX Engine</span></h1>
+      <p class="lead">
+        Uma engine completa com editor visual, física, renderização com sombras,
+        linguagem de script própria (<b>Velv</b>) e instalador nativo para Windows.
+        Do menu ao fim de jogo, tudo em um só lugar.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://github.com/NoeXVel/VelvX-Engine/releases/latest/download/VelvXEngine-1.0.0-setup.exe">
+          &#11015;&#65039; Baixar Setup <small>Windows &middot; instalador completo</small>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/NoeXVel/VelvX-Engine/releases/latest/download/VelvXEngine-1.0.0-portable.zip">
+          &#128230; Versão Portátil <small>.zip &middot; sem instalação</small>
+        </a>
+      </div>
+      <div class="hero-meta">
+        <span><b>66/66</b> testes automatizados</span>
+        <span><b>2</b> demos jogáveis inclusas</span>
+        <span><b>Editor + IDE + UI Editor</b> integrados</span>
+      </div>
+    </div>
+    <div class="hero-logo">
+      <img src="assets/img/icon.png" alt="Identidade V+X fundida da VelvX Engine">
+    </div>
+  </div>
+</header>
+
+<section id="recursos">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Tudo que uma engine precisa</h2>
+      <p>Ferramentas reais e integradas — não maquetes. Cada recurso abaixo existe no código e é coberto pela bateria de testes.</p>
+    </div>
+    <div class="features">
+      <div class="card"><div class="ico">&#127918;</div><h3>Editor visual completo</h3><p>Hierarchy, Inspector, Asset Browser em thumbnails, gizmos de mover/rotacionar/escalar com hit-test, menus de contexto e undo/redo.</p></div>
+      <div class="card"><div class="ico">&#128187;</div><h3>IDE de script integrada</h3><p>Editor unificado com autocomplete contextual, abas, busca/substituição e fechamento automático de blocos da linguagem Velv.</p></div>
+      <div class="card"><div class="ico">&#127912;</div><h3>UI Editor</h3><p>Monte menus e HUDs visualmente com widgets, prefabs de UI e vinculação direta aos scripts do jogo.</p></div>
+      <div class="card"><div class="ico">&#128295;</div><h3>Física e colisões</h3><p>RigidBody/StaticBody, gravidade por objeto, restituição, atrito, cinemáticos, detecção de chão, tags e matriz de colisão.</p></div>
+      <div class="card"><div class="ico">&#127763;</div><h3>Render 2D + 3D</h3><p>OpenGL 3.3 core: sombras PCF, MSAA, câmera ortográfica e perspectiva, sprites, importar modelos via Assimp.</p></div>
+      <div class="card"><div class="ico">&#128220;</div><h3>Linguagem Velv</h3><p>Scripting próprio com books, parâmetros, retorno, lock/unlock de variáveis e integração nativa com o Inspector.</p></div>
+      <div class="card"><div class="ico">&#128268;</div><h3>Plugins</h3><p>API IPlugin + ComponentRegistry para estender a engine com componentes e sistemas customizados em C++.</p></div>
+      <div class="card"><div class="ico">&#128230;</div><h3>Export &amp; Player</h3><p>Empacote o projeto em um ZIP executável e rode no VelvX Player standalone, sem o editor.</p></div>
+      <div class="card"><div class="ico">&#9989;</div><h3>Qualidade verificada</h3><p>66 testes automatizados cobrindo núcleo, render, física, scripting, UI e ferramentas. Build limpo reproduzível.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="download" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Baixe a VelvX Engine</h2>
+      <p>Escolha o instalador completo (recomendado) ou a versão portátil. Ambos contêm o editor, as ferramentas, as demos e a documentação.</p>
+    </div>
+    <div class="dl-grid">
+      <div class="dl-card recommended">
+        <span class="dl-tag">Recomendado</span>
+        <h3>Setup para Windows</h3>
+        <p>Instalador nativo com assistente passo a passo: licença, pasta de destino, atalhos e associação de arquivos.</p>
+        <ul>
+          <li>Atalhos no Menu Iniciar e Área de Trabalho</li>
+          <li>Associação de projetos <code>.velvproj</code></li>
+          <li>Entrada em Adicionar/Remover Programas + desinstalador</li>
+          <li>Modo silencioso: <code>/S /D=&lt;pasta&gt;</code></li>
+        </ul>
+        <a class="btn btn-primary" href="https://github.com/NoeXVel/VelvX-Engine/releases/latest/download/VelvXEngine-1.0.0-setup.exe">&#11015;&#65039; VelvXEngine-1.0.0-setup.exe</a>
+      </div>
+      <div class="dl-card">
+        <h3>Versão Portátil</h3>
+        <p>Um ZIP autocontido. Extraia em qualquer pasta e execute — ideal para pendrive ou para testar sem instalar.</p>
+        <ul>
+          <li>Mesmo conteúdo do instalador</li>
+          <li>Sem registro no sistema, sem atalhos</li>
+          <li>Editor, Player, IDE, demos e testes inclusos</li>
+          <li>Remova apagando a pasta</li>
+        </ul>
+        <a class="btn btn-ghost" href="https://github.com/NoeXVel/VelvX-Engine/releases/latest/download/VelvXEngine-1.0.0-portable.zip">&#128230; VelvXEngine-1.0.0-portable.zip</a>
+      </div>
+    </div>
+    <p class="dl-note">
+      Requisitos: Windows 10/11 64-bit com OpenGL 3.3. Código-fonte e histórico de versões em
+      <a href="https://github.com/NoeXVel/VelvX-Engine/releases">Releases</a> e
+      <a href="https://github.com/NoeXVel/VelvX-Engine">repositório</a>.
+    </p>
+  </div>
+</section>
+
+<section id="galeria">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Veja a engine em ação</h2>
+      <p>Capturas reais do editor e das duas demos jogáveis que acompanham a engine.</p>
+    </div>
+    <div class="gallery">
+      <figure class="shot wide"><img src="assets/img/editor.png" alt="Editor VelvX com cena 3D"><figcaption><b>Editor</b> — viewport 3D, hierarchy, inspector e asset browser integrados.</figcaption></figure>
+      <figure class="shot"><img src="assets/img/game2d_menu.png" alt="Menu do jogo 2D CRYSTAL RUSH"><figcaption><b>CRYSTAL RUSH</b> — menu do platformer 2D.</figcaption></figure>
+      <figure class="shot"><img src="assets/img/game2d_play.png" alt="Gameplay do platformer 2D"><figcaption><b>CRYSTAL RUSH</b> — gameplay com HUD, moedas, inimigos e fases.</figcaption></figure>
+      <figure class="shot"><img src="assets/img/game3d_menu.png" alt="Menu do FPS 3D ARENA NEON"><figcaption><b>ARENA NEON</b> — menu do FPS de ondas 3D.</figcaption></figure>
+      <figure class="shot"><img src="assets/img/game3d_play.png" alt="Gameplay do FPS 3D"><figcaption><b>ARENA NEON</b> — combate em primeira pessoa com sombras e HUD.</figcaption></figure>
+      <figure class="shot"><img src="assets/img/setup_welcome.png" alt="Assistente de instalação - boas-vindas"><figcaption><b>Setup</b> — assistente de instalação nativo.</figcaption></figure>
+      <figure class="shot"><img src="assets/img/setup_options.png" alt="Assistente de instalação - opções"><figcaption><b>Setup</b> — atalhos, associação e opções finais.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="docs" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Documentação</h2>
+      <p>Guias completos renderizados no site, sempre refletindo apenas o que a engine realmente implementa.</p>
+    </div>
+    <div class="docs-grid">
+      <a class="doc-card" href="guide.html"><h3>Primeiros Passos</h3><p>Instalação, portable, criar projeto, usar o editor, rodar e exportar o jogo.</p></a>
+      <a class="doc-card" href="language.html"><h3>Linguagem Velv</h3><p>Sintaxe, books, lock/unlock, namespaces e a API de scripting completa.</p></a>
+      <a class="doc-card" href="architecture.html"><h3>Arquitetura</h3><p>Módulos, componentes, renderer, física, scripting e o pipeline de build.</p></a>
+    </div>
+  </div>
+</section>
+
+<section id="comecar">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Comece em três passos</h2>
+      <p>Do download ao primeiro jogo rodando.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><h3>Instale ou extraia</h3><p>Rode o setup e siga o assistente, ou extraia o ZIP portátil em uma pasta de sua escolha.</p></div>
+      <div class="step"><h3>Abra o editor</h3><p>Inicie a VelvX Engine, crie um projeto ou abra uma das demos (<code>Game1_2D</code> / <code>Game2_3D</code>).</p></div>
+      <div class="step"><h3>Play &amp; export</h3><p>Aperte Play para testar no Player e use Export para gerar o pacote executável do seu jogo.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <a class="brand" href="index.html"><img src="assets/img/icon.png" alt=""><span>VelvX Engine</span></a>
+    <span>© 2026 NoeXVel · Licença MIT</span>
+    <div class="foot-links">
+      <a href="https://github.com/NoeXVel/VelvX-Engine">Repositório</a>
+      <a href="https://github.com/NoeXVel/VelvX-Engine/releases">Releases</a>
+      <a href="https://github.com/NoeXVel/VelvX-Engine/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/NoeXVel/VelvX-Engine/blob/main/CONTRIBUTING.md">Contribuir</a>
+    </div>
+  </div>
+</footer>
+
+<div class="lightbox" id="lightbox"><button class="close" aria-label="Fechar">&times;</button><img src="" alt=""></div>
+
+<script src="assets/js/app.js"></script>
+</body>
+</html>

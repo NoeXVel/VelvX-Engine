@@ -53,7 +53,7 @@ e em uma demo em execução — capture screenshots quando relevante.
   autocontido (vendorizado) de propósito.
 - Não quebre a API pública da Velv Language (`lock`, `unlock`, `book`) sem
   uma proposta de migração documentada.
-- Documentação (`Docs/`) só descreve funcionalidade **implementada e
+- Documentação (`docs/`) só descreve funcionalidade **implementada e
   testada**; atualize-a no mesmo PR da funcionalidade.
 
 ## Estilo de commit
