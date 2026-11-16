@@ -1,0 +1,35 @@
+# ---- Build / delivery outputs ----
+Build Release/
+Source/build/
+dist/
+out/
+Source/Setup/payload.zip
+Source/Setup/payload_stage/
+# Modelos de teste do Assimp (114 MB): build usa ASSIMP_BUILD_TESTS=OFF.
+Source/third_party/assimp-5.4.3/test/
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.exe
+*.dll
+
+# ---- Editor / IDE session state ----
+*.ini
+*.bak
+*.stale
+*.user
+.vs/
+.vscode/
+.idea/
+
+# ---- Logs / temp ----
+*.log
+*.tmp
+velvx.log
+
+# ---- OS ----
+Thumbs.db
+Desktop.ini
+.DS_Store

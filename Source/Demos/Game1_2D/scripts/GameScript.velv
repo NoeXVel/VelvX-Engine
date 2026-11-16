@@ -1,0 +1,197 @@
+// ============================================================================
+//  CRYSTAL RUSH (Game1_2D) — script global (GameManager).
+//  Jogo completo: Menu -> 3 fases (inicio/meio/fim) -> tela de vitoria/derrota.
+//  HUD com score/moedas/vidas/tempo, pause com Time.setScale(0) e replay.
+//
+//  Velv Language: "unlock" expoe ao Inspector; "lock" e privado.
+//  Books tambem sao funcoes: enterLevel/refreshHud/hurt/finish sao helpers.
+// ============================================================================
+
+unlock startLives = 3;
+unlock coinValue = 10;
+unlock goalBonus = 50;
+
+lock state = "menu";
+lock score = 0;
+lock coins = 0;
+lock lives = 3;
+lock level = 1;
+lock levelStart = 0;
+lock runStart = 0;
+lock spawn = vec3(-12, 1, 0);
+
+book Main()
+{
+    UI.loadPrefab("ui/Menu.ui");
+    UI.loadPrefab("ui/HUD.ui");
+    UI.loadPrefab("ui/End.ui");
+    UI.setVisible("HUD", false);
+    UI.setVisible("Pause", false);
+    UI.setVisible("How", false);
+    UI.setVisible("End", false);
+    UI.setVisible("Menu", true);
+    SceneManager.loadScene("Menu");
+    print("CRYSTAL RUSH: menu pronto. Clique em INICIAR.");
+}
+
+book StartGame()
+{
+    score = 0;
+    coins = 0;
+    lives = startLives;
+    level = 1;
+    runStart = time();
+    state = "playing";
+    Time.setScale(1);
+    UI.setVisible("Menu", false);
+    UI.setVisible("End", false);
+    UI.setVisible("Pause", false);
+    UI.setVisible("HUD", true);
+    enterLevel(1);
+}
+
+book enterLevel(n)
+{
+    level = n;
+    if (n == 1) { spawn = vec3(-12, 1, 0); }
+    if (n == 2) { spawn = vec3(-14, 1, 0); }
+    if (n == 3) { spawn = vec3(-12, 1, 0); }
+    SceneManager.loadScene("Level" + str(n));
+    levelStart = time();
+    UI.setText("LevelName", "FASE " + str(n));
+    UI.setText("Hint", "A/D move | Espaco pula | Esc pausa");
+    refreshHud();
+}
+
+book refreshHud()
+{
+    UI.setText("Score", "Score: " + str(score));
+    UI.setText("Coins", "Moedas: " + str(coins));
+    UI.setText("Lives", "Vidas: " + str(lives));
+}
+
+book ShowHow()
+{
+    UI.setVisible("How", true);
+}
+
+book HideHow()
+{
+    UI.setVisible("How", false);
+}
+
+book QuitGame()
+{
+    Application.quit();
+}
+
+book ResumeGame()
+{
+    if (state == "paused") {
+        state = "playing";
+        Time.setScale(1);
+        UI.setVisible("Pause", false);
+    }
+}
+
+book BackToMenu()
+{
+    state = "menu";
+    Time.setScale(1);
+    UI.setVisible("HUD", false);
+    UI.setVisible("Pause", false);
+    UI.setVisible("End", false);
+    UI.setVisible("Menu", true);
+    SceneManager.loadScene("Menu");
+}
+
+book PlayAgain()
+{
+    StartGame();
+}
+
+book hurt()
+{
+    lives = lives - 1;
+    refreshHud();
+    if (lives <= 0) {
+        finish(false);
+    } else {
+        GameObject.setPosition("Player", spawn);
+        GameObject.setVelocity("Player", vec3(0, 0, 0));
+        UI.setText("Hint", "Ouch! Vidas restantes: " + str(lives));
+    }
+}
+
+book finish(victory)
+{
+    state = "end";
+    Time.setScale(1);
+    UI.setVisible("HUD", false);
+    UI.setVisible("Pause", false);
+    UI.setVisible("End", true);
+    if (victory) {
+        UI.setText("EndTitle", "VITORIA!");
+    } else {
+        UI.setText("EndTitle", "FIM DE JOGO");
+    }
+    lock elapsed = floor(time() - runStart);
+    UI.setText("EndStats", "Score: " + str(score) + "  |  Moedas: " + str(coins) + "  |  Tempo: " + str(elapsed) + "s");
+    SceneManager.loadScene("End");
+}
+
+book InGame()
+{
+    if (state == "paused") {
+        if (Input.isKeyPressed(Key.Escape)) { ResumeGame(); }
+        return;
+    }
+    if (state != "playing") { return; }
+
+    if (Input.isKeyPressed(Key.Escape)) {
+        state = "paused";
+        Time.setScale(0);
+        UI.setVisible("Pause", true);
+        return;
+    }
+
+    lock elapsed = floor(time() - levelStart);
+    UI.setText("Timer", "Tempo: " + str(elapsed) + "s");
+
+    lock i = 1;
+    while (i <= 8) {
+        lock cname = "Coin" + str(i);
+        if (Physics.overlaps("Player", cname)) {
+            Destroy(GameObject.find(cname));
+            coins = coins + 1;
+            score = score + coinValue;
+            refreshHud();
+        }
+        i = i + 1;
+    }
+
+    lock h = 1;
+    while (h <= 4) {
+        if (Physics.overlaps("Player", "Hazard" + str(h))) {
+            hurt();
+            return;
+        }
+        h = h + 1;
+    }
+
+    if (GameObject.getPosition("Player").y < -8) {
+        hurt();
+        return;
+    }
+
+    if (Physics.overlaps("Player", "Goal")) {
+        score = score + goalBonus;
+        refreshHud();
+        if (level < 3) {
+            enterLevel(level + 1);
+        } else {
+            finish(true);
+        }
+        return;
+    }
+}

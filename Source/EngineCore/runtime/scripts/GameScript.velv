@@ -1,0 +1,75 @@
+// ============================================================================
+//  VelvX Engine — GameScript.velv (Velv Language)
+//
+//  book Main()   -> executado uma vez, no início
+//  book InGame() -> executado a cada frame
+//
+//  Controles:
+//    ESPACO -> carregamento assíncrono da próxima cena (trigger)
+//    E      -> instancia um cubo com física (RigidBody)
+//    R      -> informa a cena ativa e despeja o inspector
+//
+//  Velv Language: "unlock" expoe a variavel ao Inspector (editavel em runtime);
+//  "lock" mantem a variavel privada (estado interno / locais).
+// ============================================================================
+
+// Variáveis globais: visíveis em qualquer book.
+unlock nextScene = "Floor2F";
+unlock scenePosition = vec3(0, 0, 0);
+lock spawnCount = 0;
+
+book Main()
+{
+    print("VelvX Engine — Velv Language ativa!");
+
+    // Carrega a primeira cena e a deixa ativa (síncrono).
+    SceneManager.loadScene("Floor1F");
+
+    // Trigger extra: tecla R ligada ao book OnSceneInfo.
+    Trigger.bindKey(Key.R, "OnSceneInfo");
+
+    print("Controles: ESPACO = trocar cena (async) | E = instanciar cubo | R = info");
+}
+
+book InGame()
+{
+    // Input.isKeyPressed dispara apenas no frame em que a tecla desce.
+    if (Input.isKeyPressed(Key.Space)) {
+        LoadNextScene();
+    }
+    if (Input.isKeyPressed(Key.E)) {
+        SpawnCube();
+    }
+}
+
+// Carregamento assíncrono + posicionamento da nova cena.
+book LoadNextScene()
+{
+    print("Trigger ESPACO: carregando '" + nextScene + "' assincronamente...");
+    SceneManager.loadSceneAsync(nextScene);
+    SceneManager.positionScene(scenePosition);
+
+    // Alterna a próxima cena para o próximo disparo.
+    if (nextScene == "Floor2F") {
+        nextScene = "Floor1F";
+    } else {
+        nextScene = "Floor2F";
+    }
+}
+
+// Instanciação de um cubo dinâmico em posição aleatória.
+book SpawnCube()
+{
+    lock x = rand(-4, 4);
+    lock z = rand(-4, 4);
+    lock cube = Instantiate("Cube", vec3(x, 9, z));
+    spawnCount = spawnCount + 1;
+    print("Cubo instanciado:", cube.name, "| total:", spawnCount);
+}
+
+// Trigger do inspector: mostra a cena ativa e os campos UNLOCKED.
+book OnSceneInfo()
+{
+    print("Cena ativa:", SceneManager.getActiveSceneName(), "| cubos:", spawnCount);
+    Inspector.dump();
+}

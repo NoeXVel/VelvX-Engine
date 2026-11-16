@@ -1,0 +1,18 @@
+// ============================================================================
+//  Projeto vazio VelvX — ponto de partida.
+//  book Main()   -> executado uma vez, no início
+//  book InGame() -> executado a cada frame
+// ============================================================================
+
+book Main()
+{
+    SceneManager.loadScene("Main");
+    print("Projeto VelvX iniciado!");
+}
+
+book InGame()
+{
+    if (Input.isKeyPressed(Key.E)) {
+        Instantiate("Cube", vec3(rand(-4, 4), 8, rand(-4, 4)));
+    }
+}

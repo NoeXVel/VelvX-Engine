@@ -1,0 +1,53 @@
+// ============================================================================
+//  VelvX 2D Platformer — A/D ou setas movem, Espaco pula.
+//  Colete as moedas e alcance o portal azul.
+//
+//  Velv Language: "unlock" expoe a variavel ao Inspector (editavel em runtime);
+//  "lock" mantem a variavel privada (estado interno / locais).
+// ============================================================================
+
+lock score = 0;
+unlock speed = 6;
+unlock jumpSpeed = 9;
+lock finished = false;
+
+book Main()
+{
+    SceneManager.loadScene("Level1");
+    UI.loadPrefab("ui/HUD.ui");
+    print("2D Platformer: A/D move | Espaco pula | colete as moedas!");
+}
+
+book InGame()
+{
+    lock v = GameObject.getVelocity("Player");
+    lock x = Input.getAxis("Horizontal");
+    GameObject.setVelocity("Player", vec3(x * speed, v.y, 0));
+    if (Input.isKeyPressed(Key.Space)) {
+        if (v.y == 0) {
+            GameObject.setVelocity("Player", vec3(x * speed, jumpSpeed, 0));
+        }
+    }
+    if (Physics.overlaps("Player", "Coin1")) {
+        Destroy(GameObject.find("Coin1"));
+        score = score + 1;
+        UI.setText("Score", "Moedas: " + str(score));
+    }
+    if (Physics.overlaps("Player", "Coin2")) {
+        Destroy(GameObject.find("Coin2"));
+        score = score + 1;
+        UI.setText("Score", "Moedas: " + str(score));
+    }
+    if (Physics.overlaps("Player", "Coin3")) {
+        Destroy(GameObject.find("Coin3"));
+        score = score + 1;
+        UI.setText("Score", "Moedas: " + str(score));
+    }
+    if (finished == false) {
+        if (Physics.overlaps("Player", "Goal")) {
+            finished = true;
+            print("Fase concluida! Moedas: " + str(score));
+            UI.setText("Score", "Fase concluida! Moedas: " + str(score));
+        }
+    }
+}

@@ -1,0 +1,234 @@
+// ============================================================================
+//  ARENA NEON (Game2_3D) — script global (GameManager).
+//  FPS de ondas completo: Menu -> Arena (3 ondas) -> vitoria/derrota.
+//  HUD com vida/balas/onda/score/inimigos, pause (Esc), reload (R),
+//  tiro por raycast (clique), dano por contato com inimigos.
+//
+//  Velv Language: books com parametros + return/break; Instantiate de objeto.
+// ============================================================================
+
+unlock startHp = 100;
+unlock magSize = 12;
+unlock reloadTime = 1.2;
+unlock contactDamage = 15;
+
+lock state = "menu";
+lock hp = 100;
+lock mag = 12;
+lock reloading = false;
+lock reloadEnd = 0;
+lock score = 0;
+lock wave = 0;
+lock waveTotal = 0;
+lock waveKills = 0;
+lock nextEnemyId = 1;
+lock hurtCooldown = 0;
+lock runStart = 0;
+
+book Main()
+{
+    UI.loadPrefab("ui/Menu.ui");
+    UI.loadPrefab("ui/HUD.ui");
+    UI.loadPrefab("ui/End.ui");
+    UI.setVisible("HUD", false);
+    UI.setVisible("Pause", false);
+    UI.setVisible("How", false);
+    UI.setVisible("End", false);
+    UI.setVisible("Menu", true);
+    SceneManager.loadScene("Menu");
+    print("ARENA NEON: menu pronto. Clique em INICIAR.");
+}
+
+book StartGame()
+{
+    hp = startHp;
+    mag = magSize;
+    reloading = false;
+    score = 0;
+    wave = 0;
+    nextEnemyId = 1;
+    hurtCooldown = 0;
+    runStart = time();
+    state = "playing";
+    Time.setScale(1);
+    UI.setVisible("Menu", false);
+    UI.setVisible("End", false);
+    UI.setVisible("Pause", false);
+    UI.setVisible("HUD", true);
+    SceneManager.loadScene("Arena");
+    enterWave(1);
+}
+
+book enterWave(n)
+{
+    wave = n;
+    waveKills = 0;
+    waveTotal = 2 + n * 2;
+    lock i = 0;
+    while (i < waveTotal) {
+        lock ang = (i + 1) * 6.28318 / waveTotal;
+        lock x = sin(ang) * 16;
+        lock z = cos(ang) * 16;
+        if (z > 8) { if (abs(x) < 5) { z = -z; } }
+        lock e = Instantiate(GameObject.find("EnemyProto"), vec3(x, 1, z), vec3(1, 1.8, 1));
+        GameObject.setName(e, "Enemy" + str(nextEnemyId));
+        nextEnemyId = nextEnemyId + 1;
+        i = i + 1;
+    }
+    UI.setText("Wave", "Onda: " + str(n) + " / 3");
+    UI.setText("Hint", "WASD move | clique atira | R recarrega | Esc pausa");
+    refreshHud();
+    print("ARENA NEON: onda", n, "-", waveTotal, "inimigos");
+}
+
+book refreshHud()
+{
+    UI.setText("Health", "Vida: " + str(hp));
+    UI.setText("Ammo", "Balas: " + str(mag) + " / " + str(magSize));
+    UI.setText("Score", "Score: " + str(score));
+    UI.setText("Enemies", "Inimigos: " + str(waveTotal - waveKills));
+}
+
+book ShowHow()
+{
+    UI.setVisible("How", true);
+}
+
+book HideHow()
+{
+    UI.setVisible("How", false);
+}
+
+book QuitGame()
+{
+    Application.quit();
+}
+
+book ResumeGame()
+{
+    if (state == "paused") {
+        state = "playing";
+        Time.setScale(1);
+        Input.setCursorCaptured(true);
+        UI.setVisible("Pause", false);
+    }
+}
+
+book BackToMenu()
+{
+    state = "menu";
+    Time.setScale(1);
+    Input.setCursorCaptured(false);
+    UI.setVisible("HUD", false);
+    UI.setVisible("Pause", false);
+    UI.setVisible("End", false);
+    UI.setVisible("Menu", true);
+    SceneManager.loadScene("Menu");
+}
+
+book PlayAgain()
+{
+    StartGame();
+}
+
+book startReload()
+{
+    if (!reloading) {
+        if (mag < magSize) {
+            reloading = true;
+            reloadEnd = time() + reloadTime;
+            UI.setText("Hint", "Recarregando...");
+        }
+    }
+}
+
+book shoot()
+{
+    if (reloading) { return; }
+    if (mag <= 0) {
+        UI.setText("Hint", "Sem balas! Aperte R para recarregar.");
+        return;
+    }
+    mag = mag - 1;
+    lock hit = Physics.raycast(Camera.getPosition(), Camera.getForward(), 120);
+    if (hit) {
+        if (GameObject.getTag(hit) == "enemy") {
+            Destroy(hit);
+            waveKills = waveKills + 1;
+            score = score + 100;
+        }
+    }
+    refreshHud();
+}
+
+book finish(victory)
+{
+    state = "end";
+    Time.setScale(1);
+    Input.setCursorCaptured(false);
+    UI.setVisible("HUD", false);
+    UI.setVisible("Pause", false);
+    UI.setVisible("End", true);
+    if (victory) {
+        UI.setText("EndTitle", "ARENA LIMPA!");
+    } else {
+        UI.setText("EndTitle", "VOCE CAIU");
+    }
+    lock elapsed = floor(time() - runStart);
+    UI.setText("EndStats", "Score: " + str(score) + "  |  Onda: " + str(wave) + "  |  Tempo: " + str(elapsed) + "s");
+    SceneManager.loadScene("End");
+}
+
+book InGame()
+{
+    if (state == "paused") {
+        if (Input.isKeyPressed(Key.Escape)) { ResumeGame(); }
+        return;
+    }
+    if (state != "playing") { return; }
+
+    if (Input.isKeyPressed(Key.Escape)) {
+        state = "paused";
+        Time.setScale(0);
+        Input.setCursorCaptured(false);
+        UI.setVisible("Pause", true);
+        return;
+    }
+
+    if (reloading) {
+        if (time() >= reloadEnd) {
+            mag = magSize;
+            reloading = false;
+            UI.setText("Hint", "WASD move | clique atira | R recarrega | Esc pausa");
+            refreshHud();
+        }
+    }
+    if (Input.isKeyPressed(Key.R)) { startReload(); }
+    if (Input.isKeyPressed(Key.MouseLeft)) { shoot(); }
+
+    lock i = 1;
+    while (i < nextEnemyId) {
+        if (Physics.overlaps("Player", "Enemy" + str(i))) {
+            if (time() >= hurtCooldown) {
+                hurtCooldown = time() + 0.8;
+                hp = hp - contactDamage;
+                refreshHud();
+                if (hp <= 0) {
+                    finish(false);
+                    return;
+                }
+            }
+            break;
+        }
+        i = i + 1;
+    }
+
+    if (waveKills >= waveTotal) {
+        if (wave < 3) {
+            enterWave(wave + 1);
+        } else {
+            score = score + 500;
+            finish(true);
+        }
+    }
+}

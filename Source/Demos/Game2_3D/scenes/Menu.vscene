@@ -1,0 +1,40 @@
+{
+    "name": "Menu",
+    "camera": {
+        "mode": "perspective",
+        "position": [0, 5, 18],
+        "target": [0, 2, 0]
+    },
+    "objects": [
+        {
+            "name": "MainCamera",
+            "transform": {"position": [0, 5, 18], "scale": [1, 1, 1]},
+            "camera": {"projection": "perspective", "fov": 70, "near": 0.1, "far": 300, "active": true}
+        },
+        {
+            "name": "Floor",
+            "transform": {"position": [0, -0.5, 0], "scale": [40, 1, 40]},
+            "mesh": {"type": "cube", "color": [0.10, 0.11, 0.16]}
+        },
+        {
+            "name": "BackWall",
+            "transform": {"position": [0, 4, -10], "scale": [40, 9, 1]},
+            "mesh": {"type": "cube", "color": [0.13, 0.10, 0.20]}
+        },
+        {
+            "name": "NeonLeft",
+            "transform": {"position": [-7, 2.5, -6], "scale": [1.2, 5, 1.2]},
+            "mesh": {"type": "cube", "color": [0.2, 0.8, 0.9]}
+        },
+        {
+            "name": "NeonRight",
+            "transform": {"position": [7, 2.5, -6], "scale": [1.2, 5, 1.2]},
+            "mesh": {"type": "cube", "color": [0.8, 0.25, 0.8]}
+        },
+        {
+            "name": "NeonMid",
+            "transform": {"position": [0, 3.5, -8], "scale": [1.6, 7, 1.6]},
+            "mesh": {"type": "cube", "color": [0.5, 0.3, 0.95]}
+        }
+    ]
+}

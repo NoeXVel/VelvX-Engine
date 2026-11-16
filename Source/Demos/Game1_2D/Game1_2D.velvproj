@@ -1,0 +1,8 @@
+{
+    "name": "Game1_2D",
+    "engineVersion": "1.0",
+    "template": "2DPlatformer",
+    "mainScene": "Menu",
+    "mainScript": "scripts/GameScript.velv",
+    "scenes": ["Menu", "Level1", "Level2", "Level3", "End"]
+}

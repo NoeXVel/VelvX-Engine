@@ -1,0 +1,8 @@
+{
+    "name": "EmptyProject",
+    "engineVersion": "1.0",
+    "template": "Empty",
+    "mainScene": "Main",
+    "mainScript": "scripts/GameScript.velv",
+    "scenes": ["Main"]
+}

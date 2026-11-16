@@ -1,0 +1,42 @@
+{
+    "type": "Panel",
+    "name": "HUD",
+    "position": [0, 0],
+    "size": [1280, 720],
+    "anchor": "TopLeft",
+    "relative": false,
+    "visible": true,
+    "interactable": false,
+    "script": "",
+    "color": [0, 0, 0, 0],
+    "children": [
+        {
+            "type": "Text",
+            "name": "Score",
+            "position": [24, 20],
+            "size": [400, 32],
+            "anchor": "TopLeft",
+            "relative": false,
+            "visible": true,
+            "interactable": false,
+            "script": "",
+            "color": [1, 0.9, 0.3, 1],
+            "text": "Moedas: 0",
+            "fontSize": 26
+        },
+        {
+            "type": "Text",
+            "name": "Hint",
+            "position": [24, 60],
+            "size": [600, 24],
+            "anchor": "TopLeft",
+            "relative": false,
+            "visible": true,
+            "interactable": false,
+            "script": "",
+            "color": [0.85, 0.85, 0.9, 0.9],
+            "text": "A/D move | Espaco pula | portal azul = fim",
+            "fontSize": 18
+        }
+    ]
+}

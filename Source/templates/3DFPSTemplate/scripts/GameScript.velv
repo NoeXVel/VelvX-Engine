@@ -1,0 +1,18 @@
+// ============================================================================
+//  VelvX 3D FPS (template) — script global: carrega a arena.
+//  O movimento / mouse-look / disparo ficam em scripts/FPSController.velv,
+//  anexado ao GameObject "Player"; a camera e o GameObject "MainCamera"
+//  (componente Camera), parenteada ao Player pelo FPSController.
+//
+//  Velv Language: "unlock" expoe ao Inspector; "lock" e privado.
+// ============================================================================
+
+book Main()
+{
+    SceneManager.loadScene("Arena");
+    print("FPS: WASD move | mouse olha | clique atira cubo | Shift corre | Tab solta o cursor");
+}
+
+book InGame()
+{
+}

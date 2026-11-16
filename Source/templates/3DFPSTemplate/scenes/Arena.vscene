@@ -1,0 +1,82 @@
+{
+    "name": "Arena",
+    "camera": {
+        "mode": "perspective",
+        "position": [0, 2, 12],
+        "target": [0, 1.5, 0]
+    },
+    "objects": [
+        {
+            "name": "Player",
+            "transform": {"position": [0, 1, 12], "scale": [1, 1.8, 1]},
+            "mesh": {"type": "cube", "color": [0.95, 0.55, 0.15]},
+            "physics": "dynamic",
+            "layer": 1,
+            "rigid": {"mass": 1, "restitution": 0, "friction": 0.15, "useGravity": true},
+            "collider": {"size": [1, 1, 1]},
+            "scripts": ["scripts/FPSController.velv"]
+        },
+        {
+            "name": "MainCamera",
+            "transform": {"position": [0, 2.5, 12], "scale": [1, 1, 1]},
+            "camera": {"projection": "perspective", "fov": 70, "near": 0.1, "far": 300, "active": true}
+        },
+        {
+            "name": "Floor",
+            "transform": {"position": [0, -0.5, 0], "scale": [40, 1, 40]},
+            "mesh": {"type": "cube", "color": [0.42, 0.44, 0.47]},
+            "physics": "static",
+            "collider": {"size": [1, 1, 1]}
+        },
+        {
+            "name": "WallNorth",
+            "transform": {"position": [0, 2, -20], "scale": [40, 4, 1]},
+            "mesh": {"type": "cube", "color": [0.55, 0.30, 0.30]},
+            "physics": "static"
+        },
+        {
+            "name": "WallSouth",
+            "transform": {"position": [0, 2, 20], "scale": [40, 4, 1]},
+            "mesh": {"type": "cube", "color": [0.55, 0.30, 0.30]},
+            "physics": "static"
+        },
+        {
+            "name": "WallEast",
+            "transform": {"position": [20, 2, 0], "scale": [1, 4, 40]},
+            "mesh": {"type": "cube", "color": [0.55, 0.30, 0.30]},
+            "physics": "static"
+        },
+        {
+            "name": "WallWest",
+            "transform": {"position": [-20, 2, 0], "scale": [1, 4, 40]},
+            "mesh": {"type": "cube", "color": [0.55, 0.30, 0.30]},
+            "physics": "static"
+        },
+        {
+            "name": "Pillar1",
+            "transform": {"position": [-6, 2, -6], "scale": [1.5, 4, 1.5]},
+            "mesh": {"type": "cube", "color": [0.6, 0.6, 0.65]},
+            "physics": "static"
+        },
+        {
+            "name": "Pillar2",
+            "transform": {"position": [6, 2, -6], "scale": [1.5, 4, 1.5]},
+            "mesh": {"type": "cube", "color": [0.6, 0.6, 0.65]},
+            "physics": "static"
+        },
+        {
+            "name": "Crate1",
+            "transform": {"position": [3, 1, 2], "scale": [1.2, 1.2, 1.2]},
+            "mesh": {"type": "cube", "color": [0.8, 0.55, 0.25]},
+            "physics": "dynamic",
+            "rigid": {"mass": 2, "restitution": 0.2}
+        },
+        {
+            "name": "Crate2",
+            "transform": {"position": [-4, 1, 4], "scale": [1.2, 1.2, 1.2]},
+            "mesh": {"type": "cube", "color": [0.8, 0.55, 0.25]},
+            "physics": "dynamic",
+            "rigid": {"mass": 2, "restitution": 0.2}
+        }
+    ]
+}

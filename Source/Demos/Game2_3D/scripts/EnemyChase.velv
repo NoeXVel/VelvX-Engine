@@ -1,0 +1,25 @@
+// ============================================================================
+//  EnemyChase.velv — anexado ao "EnemyProto" e a cada clone (Instantiate).
+//  Persegue o Player no plano XZ com velocidade constante. O template fica
+//  enterrado (y < -10) e dorme ate ser clonado para a arena.
+//  Pausa global (Time.setScale(0)) congela dt() e o inimigo para junto.
+// ============================================================================
+
+unlock speed = 3;
+
+book Main()
+{
+}
+
+book InGame()
+{
+    lock p = GameObject.getPosition(self);
+    if (p.y < -10) { return; }
+    lock t = GameObject.getPosition("Player");
+    lock dx = t.x - p.x;
+    lock dz = t.z - p.z;
+    lock len = sqrt(dx * dx + dz * dz);
+    if (len < 0.5) { return; }
+    lock step = speed * dt();
+    GameObject.setPosition(self, vec3(p.x + dx / len * step, p.y, p.z + dz / len * step));
+}

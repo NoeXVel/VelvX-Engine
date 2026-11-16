@@ -1,0 +1,26 @@
+// ============================================================================
+//  PlayerController.velv — anexado ao GameObject "Player".
+//  Controla o proprio objeto via "self" (Transform + RigidBody).
+//  "unlock" expoe speed/jumpSpeed ao Inspector (editaveis com o Player selecionado).
+// ============================================================================
+
+unlock speed = 6;
+unlock jumpSpeed = 9.5;
+
+book Main()
+{
+    print("PlayerController ativo em", self.name);
+}
+
+book InGame()
+{
+    lock v = GameObject.getVelocity(self);
+    lock x = Input.getAxis("Horizontal");
+    GameObject.setVelocity(self, vec3(x * speed, v.y, 0));
+
+    if (Input.isKeyPressed(Key.Space)) {
+        if (GameObject.isGrounded(self)) {
+            GameObject.setVelocity(self, vec3(x * speed, jumpSpeed, 0));
+        }
+    }
+}

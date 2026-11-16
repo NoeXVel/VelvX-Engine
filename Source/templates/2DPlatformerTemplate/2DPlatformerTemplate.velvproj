@@ -1,0 +1,8 @@
+{
+    "name": "2DPlatformerTemplate",
+    "engineVersion": "1.0",
+    "template": "2DPlatformer",
+    "mainScene": "Level1",
+    "mainScript": "scripts/GameScript.velv",
+    "scenes": ["Level1"]
+}

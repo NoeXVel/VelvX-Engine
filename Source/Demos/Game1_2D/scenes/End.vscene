@@ -1,0 +1,26 @@
+{
+    "name": "End",
+    "camera": {
+        "mode": "ortho2d",
+        "position": [0, 5, 20],
+        "target": [0, 5, 0],
+        "orthoHeight": 14
+    },
+    "objects": [
+        {
+            "name": "MainCamera",
+            "transform": {"position": [0, 5, 20], "scale": [1, 1, 1]},
+            "camera": {"projection": "ortho", "orthoHeight": 14, "near": 0.1, "far": 100, "active": true}
+        },
+        {
+            "name": "BackDrop",
+            "transform": {"position": [0, 5, -2], "scale": [44, 26, 1]},
+            "mesh": {"type": "quad", "color": [0.06, 0.09, 0.10]}
+        },
+        {
+            "name": "Trophy",
+            "transform": {"position": [0, 6, 0], "scale": [3, 3.6, 1]},
+            "mesh": {"type": "quad", "color": [1, 0.85, 0.2]}
+        }
+    ]
+}

@@ -1,0 +1,66 @@
+{
+  "name": "Floor1F",
+  "camera": {
+    "mode": "perspective",
+    "position": [0.0, 8.5, 15.0],
+    "target": [0.0, 1.0, 0.0],
+    "orthoHeight": 12.0
+  },
+  "objects": [
+    {
+      "name": "Floor",
+      "transform": { "position": [0.0, -0.5, 0.0], "rotation": [0.0, 0.0, 0.0], "scale": [26.0, 1.0, 26.0] },
+      "mesh": { "type": "plane", "color": [0.28, 0.30, 0.36], "texture": "", "importedModel": -1, "imported": -1 },
+      "physics": "static"
+    },
+    {
+      "name": "Platform",
+      "transform": { "position": [0.0, 0.25, 0.0], "rotation": [0.0, 0.0, 0.0], "scale": [6.0, 0.5, 6.0] },
+      "mesh": { "type": "cube", "color": [0.38, 0.40, 0.48], "texture": "", "importedModel": -1, "imported": -1 },
+      "physics": "static"
+    },
+    {
+      "name": "PillarNW",
+      "transform": { "position": [-7.0, 2.0, -7.0], "rotation": [0.0, 0.0, 0.0], "scale": [1.2, 5.0, 1.2] },
+      "mesh": { "type": "cube", "color": [0.55, 0.35, 0.85], "texture": "", "importedModel": -1, "imported": -1 },
+      "physics": "static"
+    },
+    {
+      "name": "PillarNE",
+      "transform": { "position": [7.0, 2.0, -7.0], "rotation": [0.0, 0.0, 0.0], "scale": [1.2, 5.0, 1.2] },
+      "mesh": { "type": "cube", "color": [0.55, 0.35, 0.85], "texture": "", "importedModel": -1, "imported": -1 },
+      "physics": "static"
+    },
+    {
+      "name": "PillarSW",
+      "transform": { "position": [-7.0, 2.0, 7.0], "rotation": [0.0, 0.0, 0.0], "scale": [1.2, 5.0, 1.2] },
+      "mesh": { "type": "cube", "color": [0.55, 0.35, 0.85], "texture": "", "importedModel": -1, "imported": -1 },
+      "physics": "static"
+    },
+    {
+      "name": "PillarSE",
+      "transform": { "position": [7.0, 2.0, 7.0], "rotation": [0.0, 0.0, 0.0], "scale": [1.2, 5.0, 1.2] },
+      "mesh": { "type": "cube", "color": [0.55, 0.35, 0.85], "texture": "", "importedModel": -1, "imported": -1 },
+      "physics": "static"
+    },
+    {
+      "name": "Step1",
+      "transform": { "position": [-3.0, 0.25, 4.0], "rotation": [0.0, 0.0, 0.0], "scale": [2.0, 0.5, 1.5] },
+      "mesh": { "type": "cube", "color": [0.45, 0.47, 0.55], "texture": "", "importedModel": -1, "imported": -1 },
+      "physics": "static"
+    },
+    {
+      "name": "Step2",
+      "transform": { "position": [-3.0, 0.75, 5.5], "rotation": [0.0, 0.0, 0.0], "scale": [2.0, 0.5, 1.5] },
+      "mesh": { "type": "cube", "color": [0.45, 0.47, 0.55], "texture": "", "importedModel": -1, "imported": -1 },
+      "physics": "static"
+    },
+    {
+      "name": "Crate",
+      "transform": { "position": [3.0, 0.5, -3.0], "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0] },
+      "mesh": { "type": "cube", "color": [0.95, 0.55, 0.25], "texture": "", "importedModel": -1, "imported": -1 },
+      "physics": "dynamic",
+      "rigid": { "mass": 1.0, "restitution": 0.35, "useGravity": true, "kinematic": false }
+    }
+  ]
+}

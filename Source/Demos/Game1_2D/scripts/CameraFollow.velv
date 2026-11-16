@@ -1,0 +1,23 @@
+// ============================================================================
+//  CameraFollow.velv — anexado ao GameObject "MainCamera" (Camera component).
+//  A camera e um objeto independente: segue o Player em X e Y com suavizacao,
+//  preservando a distancia Z inicial. Funciona em fases horizontais e verticais.
+// ============================================================================
+
+unlock smooth = 6;
+unlock offsetY = 2;
+lock targetName = "Player";
+
+book Main()
+{
+}
+
+book InGame()
+{
+    lock p = GameObject.getPosition(targetName);
+    lock cp = GameObject.getPosition(self);
+    lock t = clamp(smooth * dt(), 0, 1);
+    lock nx = cp.x + (p.x - cp.x) * t;
+    lock ny = cp.y + (p.y + offsetY - cp.y) * t;
+    GameObject.setPosition(self, vec3(nx, ny, cp.z));
+}

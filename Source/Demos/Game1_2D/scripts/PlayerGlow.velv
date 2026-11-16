@@ -1,0 +1,22 @@
+// ============================================================================
+//  PlayerGlow.velv — segundo script anexado ao "Player" (multi-script).
+//  Realca a cor do player enquanto ele se move. Demonstra varios scripts
+//  independentes no mesmo GameObject, cada um com seus campos unlock.
+// ============================================================================
+
+unlock idleColor = vec3(0.95, 0.55, 0.15);
+unlock moveColor = vec3(1.0, 0.85, 0.35);
+
+book Main()
+{
+}
+
+book InGame()
+{
+    lock v = GameObject.getVelocity(self);
+    if (abs(v.x) > 0.1) {
+        GameObject.setColor(self, moveColor);
+    } else {
+        GameObject.setColor(self, idleColor);
+    }
+}

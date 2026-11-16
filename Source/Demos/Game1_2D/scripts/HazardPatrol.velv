@@ -1,0 +1,20 @@
+// ============================================================================
+//  HazardPatrol.velv — anexado a hazards moveis: patrulha horizontal em seno.
+//  Demonstra tempo de jogo (time()) congelado durante o pause (Time.setScale).
+// ============================================================================
+
+unlock range = 2;
+unlock speed = 1.5;
+
+lock baseX = 0;
+
+book Main()
+{
+    baseX = GameObject.getPosition(self).x;
+}
+
+book InGame()
+{
+    lock p = GameObject.getPosition(self);
+    GameObject.setPosition(self, vec3(baseX + sin(time() * speed) * range, p.y, p.z));
+}

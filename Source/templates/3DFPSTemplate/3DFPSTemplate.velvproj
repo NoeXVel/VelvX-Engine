@@ -1,0 +1,8 @@
+{
+    "name": "3DFPSTemplate",
+    "engineVersion": "1.0",
+    "template": "3DFPS",
+    "mainScene": "Arena",
+    "mainScript": "scripts/GameScript.velv",
+    "scenes": ["Arena"]
+}

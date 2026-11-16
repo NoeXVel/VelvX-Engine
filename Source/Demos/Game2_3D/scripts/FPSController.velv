@@ -1,0 +1,62 @@
+// ============================================================================
+//  FPSController.velv — anexado ao GameObject "Player" (demo 3D / template FPS).
+//  Movimento WASD + corrida (Shift) + pulo (Espaco), mouse-look com captura
+//  do cursor (Tab alterna). A camera "MainCamera" e um GameObject separado
+//  com componente Camera, parenteado ao Player. O tiro fica no GameScript.
+// ============================================================================
+
+unlock walkSpeed = 6;
+unlock runSpeed = 11;
+unlock jumpSpeed = 7;
+unlock sensitivity = 0.0025;
+unlock eyeHeight = 1.6;
+lock yaw = 0;
+lock pitch = 0;
+lock R2D = 57.29577951308232;
+
+book Main()
+{
+    lock cam = GameObject.find("MainCamera");
+    GameObject.setParent(cam, self);
+    GameObject.setPosition(cam, vec3(0, eyeHeight, 0));
+    Input.setCursorCaptured(true);
+    print("FPSController ativo em", self.name);
+}
+
+book InGame()
+{
+    if (Input.isKeyPressed(Key.Tab)) {
+        Input.setCursorCaptured(!Input.isCursorCaptured());
+    }
+    if (Input.isCursorCaptured()) {
+        lock d = Input.getMouseDelta();
+        yaw = yaw - d.x * sensitivity;
+        pitch = clamp(pitch - d.y * sensitivity, -1.4, 1.4);
+    }
+
+    lock cp = cos(pitch);
+    lock fx = -sin(yaw) * cp;
+    lock fz = -cos(yaw) * cp;
+    lock rx = cos(yaw);
+    lock rz = -sin(yaw);
+
+    lock speed = walkSpeed;
+    if (Input.isKeyDown(Key.LeftShift)) { speed = runSpeed; }
+    lock mx = 0;
+    lock mz = 0;
+    if (Input.isKeyDown(Key.W)) { mx = mx + fx; mz = mz + fz; }
+    if (Input.isKeyDown(Key.S)) { mx = mx - fx; mz = mz - fz; }
+    if (Input.isKeyDown(Key.D)) { mx = mx + rx; mz = mz + rz; }
+    if (Input.isKeyDown(Key.A)) { mx = mx - rx; mz = mz - rz; }
+
+    lock v = GameObject.getVelocity(self);
+    GameObject.setVelocity(self, vec3(mx * speed, v.y, mz * speed));
+    if (Input.isKeyPressed(Key.Space)) {
+        if (GameObject.isGrounded(self)) {
+            GameObject.setVelocity(self, vec3(mx * speed, jumpSpeed, mz * speed));
+        }
+    }
+
+    lock cam = GameObject.find("MainCamera");
+    GameObject.setRotation(cam, vec3(pitch * R2D, yaw * R2D, 0));
+}

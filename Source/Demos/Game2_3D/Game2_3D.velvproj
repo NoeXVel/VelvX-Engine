@@ -1,0 +1,8 @@
+{
+    "name": "Game2_3D",
+    "engineVersion": "1.0",
+    "template": "3DFPS",
+    "mainScene": "Menu",
+    "mainScript": "scripts/GameScript.velv",
+    "scenes": ["Menu", "Arena", "End"]
+}

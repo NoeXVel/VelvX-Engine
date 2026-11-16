@@ -1,0 +1,4 @@
+#include "resource.h"
+
+IDI_APPICON ICON "../../packaging/Icon.ico"
+IDR_PAYLOAD RCDATA "payload.zip"
